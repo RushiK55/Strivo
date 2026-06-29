@@ -4,6 +4,7 @@ import '../widgets/wheel_picker.dart';
 import '../services/user_manager.dart';
 import '../providers/AuthProvider.dart';
 import 'HomeScreen.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -57,11 +58,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
             _buildProgressIndicator(),
             Expanded(
               child: PageView(
@@ -87,13 +88,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(4, (index) {
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+        bool isActive = _currentIndex == index;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 5),
           height: 8,
-          width: _currentIndex == index ? 24 : 8,
+          width: isActive ? 30 : 8,
           decoration: BoxDecoration(
-            color: _currentIndex == index ? Colors.deepPurple : Colors.grey[300],
-            borderRadius: BorderRadius.circular(4),
+            color: isActive ? AppColors.accent : const Color(0xFF2C2C2E),
+            borderRadius: BorderRadius.circular(10),
           ),
         );
       }),
@@ -102,14 +105,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildStepContainer({required String title, required String subtitle, required Widget child}) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 32.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(subtitle, style: TextStyle(fontSize: 16, color: Colors.grey[600])),
-          const SizedBox(height: 40),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 60),
           child,
         ],
       ),
@@ -123,9 +137,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _genderButton("Male", Icons.male),
-          const SizedBox(width: 20),
-          _genderButton("Female", Icons.female),
+          _genderButton("Male", Icons.male_rounded),
+          const SizedBox(width: 24),
+          _genderButton("Female", Icons.female_rounded),
         ],
       ),
     );
@@ -137,17 +151,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       onTap: () => setState(() => _gender = value),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+        width: 120,
+        height: 140,
         decoration: BoxDecoration(
-          color: isSelected ? Colors.deepPurple : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          color: isSelected ? AppColors.accent : AppColors.surface,
+          borderRadius: BorderRadius.circular(30),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 40, color: isSelected ? Colors.white : Colors.deepPurple),
-            const SizedBox(height: 8),
-            Text(value, style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+            Icon(icon, size: 48, color: isSelected ? Colors.black : AppColors.accent),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: TextStyle(
+                  color: isSelected ? Colors.black : AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 16),
+            ),
           ],
         ),
       ),
@@ -157,7 +178,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildAgeStep() {
     return _buildStepContainer(
       title: "How old are you?",
-      subtitle: "Your age helps us calculate calories",
+      subtitle: "Your age helps us calculate metrics",
       child: WheelPicker(
         label: "YEARS",
         minValue: 10,
@@ -171,7 +192,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildHeightStep() {
     return _buildStepContainer(
       title: "What's your height?",
-      subtitle: "In centimeters",
+      subtitle: "Measure in centimeters",
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -184,7 +205,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const Padding(
             padding: EdgeInsets.only(top: 40),
-            child: Text(".", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
+            child: Text(".",
+                style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
           ),
           WheelPicker(
             label: "",
@@ -200,8 +225,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildWeightStep() {
     return _buildStepContainer(
-      title: "Current weight?",
-      subtitle: "In kilograms",
+      title: "What's your weight?",
+      subtitle: "Measure in kilograms",
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -214,7 +239,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const Padding(
             padding: EdgeInsets.only(top: 40),
-            child: Text(".", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
+            child: Text(".",
+                style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
           ),
           WheelPicker(
             label: "",
@@ -230,26 +259,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildBottomBar() {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.fromLTRB(32, 24, 32, 40),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (_currentIndex > 0)
             TextButton(
-              onPressed: () => _pageController.previousPage(duration: const Duration(milliseconds: 500), curve: Curves.easeInOut),
-              child: const Text("BACK", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              onPressed: () => _pageController.previousPage(
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut),
+              child: const Text("BACK",
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2)),
             )
           else
             const SizedBox(),
-          ElevatedButton(
-            onPressed: _nextPage,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          SizedBox(
+            height: 55,
+            width: 150,
+            child: ElevatedButton(
+              onPressed: _nextPage,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 0,
+              ),
+              child: Text(_currentIndex == 3 ? "FINISH" : "NEXT",
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             ),
-            child: Text(_currentIndex == 3 ? "FINISH" : "NEXT", style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

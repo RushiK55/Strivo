@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:strivo/Screens/ExerciseList.dart';
+import 'package:strivo/Screens/PlanDetailsScreen.dart';
 import 'package:strivo/models/Plan.dart';
 import 'package:strivo/providers/PlanProvider.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class SavePlan extends StatefulWidget {
   final String? initialDay;
@@ -46,36 +47,68 @@ class _SavePlanState extends State<SavePlan> {
     final plansForSelectedDay = groupedPlans[_selectedDay] ?? [];
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Create New Plan"),
+        title: const Text("Create New Plan",
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
         elevation: 0,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Plan Details",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "PLAN DETAILS",
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                        letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 40,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               TextFormField(
                 controller: _planNameController,
+                style: const TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   labelText: 'Plan Name',
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
                   hintText: 'e.g. Chest & Triceps',
-                  prefixIcon: const Icon(Icons.fitness_center),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  hintStyle: const TextStyle(color: Color(0xFF5E5E5E)),
+                  prefixIcon: const Icon(Icons.fitness_center_rounded, color: AppColors.accent),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: AppColors.surface),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: AppColors.accent),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[50],
+                  fillColor: AppColors.surface,
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -84,27 +117,30 @@ class _SavePlanState extends State<SavePlan> {
                   return null;
                 },
               ),
-              const SizedBox(height: 25),
-              Text(
-                "Select Day",
+              const SizedBox(height: 30),
+              const Text(
+                "SELECT DAY",
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                  letterSpacing: 1.2,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey),
-                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.surface,
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     isExpanded: true,
                     value: _selectedDay,
+                    dropdownColor: AppColors.surface,
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.accent),
                     items: _days.map((String day) {
                       final hasPlan = (groupedPlans[day] ?? []).isNotEmpty;
                       return DropdownMenuItem<String>(
@@ -112,18 +148,18 @@ class _SavePlanState extends State<SavePlan> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(day),
+                            Text(day, style: const TextStyle(fontWeight: FontWeight.w500)),
                             if (hasPlan)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange[50],
+                                  color: AppColors.accent.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.orange[200]!),
+                                  border: Border.all(color: AppColors.accent.withOpacity(0.3)),
                                 ),
                                 child: Text(
                                   "${groupedPlans[day]!.length} Plan(s)",
-                                  style: TextStyle(fontSize: 10, color: Colors.orange[800]),
+                                  style: const TextStyle(fontSize: 10, color: AppColors.accent, fontWeight: FontWeight.bold),
                                 ),
                               ),
                           ],
@@ -140,46 +176,49 @@ class _SavePlanState extends State<SavePlan> {
               ),
               if (plansForSelectedDay.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12, left: 4),
+                  padding: const EdgeInsets.only(top: 16, left: 4),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                      const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.accent),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          "You already have ${plansForSelectedDay.length} plan(s) for $_selectedDay. You can still add another.",
-                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                          "You already have ${plansForSelectedDay.length} plan(s) for $_selectedDay.",
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                         ),
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 40),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(height: 60),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    elevation: 0,
                   ),
-                  elevation: 2,
-                ),
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    int id = await planProvider.addPlan(
-                      Plan(
-                        planName: _planNameController.text,
-                        planDay: _selectedDay,
-                      ),
-                    );
-                    if (mounted) {
-                      savePlan(id, _planNameController.text, _selectedDay);
+                  onPressed: () async {
+                    if (_formKey.currentState!.validate()) {
+                      int id = await planProvider.addPlan(
+                        Plan(
+                          planName: _planNameController.text,
+                          planDay: _selectedDay,
+                        ),
+                      );
+                      if (mounted) {
+                        savePlan(id, _planNameController.text, _selectedDay);
+                      }
                     }
-                  }
-                },
-                child: const Center(
-                  child: Text(
-                    "Save Plan",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  },
+                  child: const Text(
+                    "SAVE PLAN",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -193,9 +232,12 @@ class _SavePlanState extends State<SavePlan> {
   void savePlan(int id, String planName, String day) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("Plan Saved"),
-        content: Text("Plan '$planName' has been added to $day."),
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: const Text("Plan Saved", style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        content: Text("Plan '$planName' has been added to $day.", style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () {
@@ -203,13 +245,13 @@ class _SavePlanState extends State<SavePlan> {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => Exerciselist(
+                  builder: (context) => PlanDetailsScreen(
                     plan: Plan(planId: id, planName: planName, planDay: day),
                   ),
                 ),
               );
             },
-            child: const Text("OK"),
+            child: const Text("OK", style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

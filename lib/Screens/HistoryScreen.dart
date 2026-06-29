@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:strivo/models/workout_session.dart';
+import 'package:strivo/providers/ExerciseProvider.dart';
+import 'package:strivo/utils/app_colors.dart';
 import 'HistoryDetailsScreen.dart';
-import '../database/database_helper.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -11,77 +14,83 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  Map<String, List<Map<String, dynamic>>> _groupedHistory = {};
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadHistory();
-  }
-
-  Future<void> _loadHistory() async {
-    final history = await DatabaseHelper.instance.getHistory();
-    Map<String, List<Map<String, dynamic>>> grouped = {};
-
-    for (var item in history) {
-      DateTime date = DateTime.parse(item['completedAt']);
-      String dateKey = DateFormat('yyyy-MM-dd').format(date);
-      if (grouped[dateKey] == null) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey]!.add(item);
-    }
-
-    setState(() {
-      _groupedHistory = grouped;
-      _isLoading = false;
-    });
+    Future.microtask(() =>
+        Provider.of<Exerciseprovider>(context, listen: false).fetchHistory());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Workout History", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Workout History",
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _groupedHistory.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  itemCount: _groupedHistory.keys.length,
-                  itemBuilder: (context, index) {
-                    String dateKey = _groupedHistory.keys.elementAt(index);
-                    List<Map<String, dynamic>> exercises = _groupedHistory[dateKey]!;
-                    DateTime date = DateTime.parse(dateKey);
+      body: Consumer<Exerciseprovider>(
+        builder: (context, provider, child) {
+          if (provider.history.isEmpty) {
+            return _buildEmptyState();
+          }
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          // Group sessions by date for display
+          Map<String, List<WorkoutSession>> groupedHistory = {};
+          for (var session in provider.history) {
+            String dateKey = DateFormat('yyyy-MM-dd').format(session.date);
+            if (groupedHistory[dateKey] == null) {
+              groupedHistory[dateKey] = [];
+            }
+            groupedHistory[dateKey]!.add(session);
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            itemCount: groupedHistory.keys.length,
+            itemBuilder: (context, index) {
+              String dateKey = groupedHistory.keys.elementAt(index);
+              List<WorkoutSession> sessions = groupedHistory[dateKey]!;
+              DateTime date = DateTime.parse(dateKey);
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                    child: Row(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          child: Text(
-                            _getFormattedDate(date),
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[600],
-                              letterSpacing: 0.5,
-                            ),
+                        Text(
+                          _getFormattedDate(date),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textSecondary,
+                            letterSpacing: 1.0,
                           ),
                         ),
-                        ...exercises.map((e) => _buildHistoryCard(e)).toList(),
-                        const SizedBox(height: 10),
+                        const SizedBox(width: 8),
+                        Expanded(child: Divider(color: AppColors.surface, thickness: 1)),
                       ],
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  ...sessions.map((s) => _buildHistoryCard(s)).toList(),
+                  const SizedBox(height: 10),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -89,9 +98,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     DateTime now = DateTime.now();
     DateTime yesterday = DateTime.now().subtract(const Duration(days: 1));
 
-    if (DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(now)) {
+    if (DateFormat('yyyy-MM-dd').format(date) ==
+        DateFormat('yyyy-MM-dd').format(now)) {
       return "TODAY";
-    } else if (DateFormat('yyyy-MM-dd').format(date) == DateFormat('yyyy-MM-dd').format(yesterday)) {
+    } else if (DateFormat('yyyy-MM-dd').format(date) ==
+        DateFormat('yyyy-MM-dd').format(yesterday)) {
       return "YESTERDAY";
     } else {
       return DateFormat('EEEE, d MMM').format(date).toUpperCase();
@@ -103,62 +114,108 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text("No history yet", style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          Text("Your completed exercises will appear here", style: TextStyle(color: Colors.grey[400])),
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.history_rounded, size: 60, color: AppColors.accent.withOpacity(0.5)),
+          ),
+          const SizedBox(height: 30),
+          const Text("No history found",
+              style: TextStyle(
+                  fontSize: 22,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.0)),
+          const SizedBox(height: 12),
+          const Text("Your workout legacy starts here.",
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryCard(Map<String, dynamic> item) {
-    return InkWell(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HistoryDetailsScreen(historyItem: item),
-          ),
-        );
-      },
-      child: Card(
-        elevation: 0,
-        margin: const EdgeInsets.only(bottom: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+  Widget _buildHistoryCard(WorkoutSession session) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HistoryDetailsScreen(session: session),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(30),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.accent.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle, color: Colors.deepPurple, size: 24),
+                child: const Icon(Icons.fitness_center_rounded,
+                    color: AppColors.accent, size: 24),
               ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item['name'],
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      session.planName,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: 0.5),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "${item['sets']} sets • ${item['reps']} reps • ${item['weight']} kg",
-                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.timer_outlined, size: 12, color: AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          session.totalTime,
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.bolt_rounded, size: 12, color: AppColors.accent),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${session.exercises.length} EXERCISES",
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              Text(
-                DateFormat('h:mm a').format(DateTime.parse(item['completedAt'])),
-                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    DateFormat('h:mm a').format(session.date),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2E),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.textPrimary),
+                  ),
+                ],
               ),
             ],
           ),

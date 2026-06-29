@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:strivo/Screens/WorkoutPlanPage.dart';
+import 'package:strivo/Screens/HistoryScreen.dart';
+import 'package:strivo/Screens/PlanDetailsScreen.dart';
 import 'package:strivo/Screens/ExerciseDetailsScreen.dart';
 import 'package:strivo/Screens/DayPlansScreen.dart';
 import 'package:strivo/Screens/save_plan.dart';
@@ -12,6 +14,7 @@ import 'package:strivo/models/Plan.dart';
 import 'package:strivo/providers/AuthProvider.dart';
 import 'package:strivo/services/user_manager.dart';
 import 'package:strivo/widgets/wheel_picker.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class Homescreen extends StatefulWidget {
   const Homescreen({super.key});
@@ -21,9 +24,9 @@ class Homescreen extends StatefulWidget {
 }
 
 class _HomescreenState extends State<Homescreen> {
-  int? _selectedPlanId; // null means "All", -1 means "Extra"
   late String _selectedDay;
   late List<DateTime> _currentWeek;
+  final ScrollController _scrollController = ScrollController();
   
   final List<String> _allDays = [
     'Monday',
@@ -34,6 +37,7 @@ class _HomescreenState extends State<Homescreen> {
     'Saturday',
     'Sunday'
   ];
+
 
   @override
   void initState() {
@@ -46,7 +50,35 @@ class _HomescreenState extends State<Homescreen> {
       Provider.of<Planprovider>(context, listen: false).refreshPlans();
       Provider.of<Exerciseprovider>(context, listen: false).loadExercisesByDay(_selectedDay);
       _checkWeeklyWeight();
+      _scrollToToday();
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToToday() {
+    if (!_scrollController.hasClients) return;
+
+    final now = DateTime.now();
+    int todayIndex = now.weekday - 1;
+    double itemWidth = 87.0; // 75 (width) + 12 (horizontal margins)
+    double padding = 16.0;
+
+    double screenWidth = MediaQuery.of(context).size.width;
+    double scrollOffset = (todayIndex * itemWidth) + padding;
+
+    // Center the today's item
+    double targetOffset = scrollOffset - (screenWidth / 2) + (itemWidth / 2);
+
+    _scrollController.animateTo(
+      targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
   }
 
   List<DateTime> _generateCurrentWeek(DateTime date) {
@@ -68,32 +100,64 @@ class _HomescreenState extends State<Homescreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text("Weekly Weight Update"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("It's been a week! Let's update your current weight to track progress."),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                WheelPicker(label: "KG", minValue: 30, maxValue: 250, initialValue: wInt, onChanged: (v) => wInt = v),
-                const Text(".", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-                WheelPicker(label: "", minValue: 0, maxValue: 9, initialValue: wDec, onChanged: (v) => wDec = v),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await UserManager.updateWeightOnly(wInt + (wDec / 10.0));
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text("Update"),
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Weight Update",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "Keep your progress on track!",
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  WheelPicker(
+                    label: "KG",
+                    minValue: 30,
+                    maxValue: 250,
+                    initialValue: wInt,
+                    onChanged: (v) => wInt = v,
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Text(".", style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  ),
+                  WheelPicker(
+                    label: "",
+                    minValue: 0,
+                    maxValue: 9,
+                    initialValue: wDec,
+                    onChanged: (v) => wDec = v,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              ElevatedButton(
+                onPressed: () async {
+                  await UserManager.updateWeightOnly(wInt + (wDec / 10.0));
+                  if (context.mounted) Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.black,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                child: const Text("UPDATE", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -103,564 +167,352 @@ class _HomescreenState extends State<Homescreen> {
     final exerciseProvider = Provider.of<Exerciseprovider>(context);
     final planProvider = Provider.of<Planprovider>(context);
     final authProvider = Provider.of<AuthProvider>(context);
-    
+
     final dayName = _selectedDay;
-    
     final groupedPlans = planProvider.plansByDay;
 
     return Scaffold(
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 200.0,
-            floating: false,
-            pinned: true,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.account_circle, color: Colors.white, size: 30),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
-                  );
-                },
-              ),
-              const SizedBox(width: 10),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                "Hello, ${authProvider.userName?.split(' ')[0] ?? 'User'}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.deepPurple, Colors.deepPurple.shade800],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.fitness_center, size: 48, color: Colors.white.withOpacity(0.5)),
-                      const SizedBox(height: 10),
-                      const Text(
-                        "Strivo",
-                        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
-                      ),
-                      Text(
-                        _getDayName(DateTime.now().weekday),
-                        style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w300),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          
-          // Weekly Schedule Selector
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 25, 20, 10),
-                  child: Text(
-                    "Weekly Schedule",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 110,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _currentWeek.length,
-                    itemBuilder: (context, index) {
-                      final date = _currentWeek[index];
-                      final dayName = _getDayName(date.weekday);
-                      final isSelected = dayName == _selectedDay;
-                      final isToday = dayName == _getDayName(DateTime.now().weekday);
-
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedDay = dayName;
-                            _selectedPlanId = null;
-                          });
-                          exerciseProvider.loadExercisesByDay(_selectedDay);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 70,
-                          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // Top Navigation & Branding
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF1E1E1E) : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(18),
-                            border: isSelected 
-                              ? Border.all(color: Colors.deepPurple, width: 2)
-                              : Border.all(color: Colors.transparent),
-                            boxShadow: [
-                              BoxShadow(
-                                color: isSelected 
-                                  ? Colors.deepPurple.withOpacity(0.2) 
-                                  : Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
+                            color: AppColors.accent.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _getDayAbbr(date.weekday),
-                                style: TextStyle(
-                                  color: isSelected ? Colors.grey[400] : Colors.grey[600],
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1,
-                                ),
+                          child: const Icon(Icons.fitness_center, color: AppColors.accent, size: 24),
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                shape: BoxShape.circle,
                               ),
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.all(10),
+                              child: const Icon(Icons.access_time, color: AppColors.textPrimary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? Colors.limeAccent.shade700 : (isToday ? Colors.deepPurple.withOpacity(0.1) : Colors.transparent),
+                                  color: AppColors.surface,
                                   shape: BoxShape.circle,
                                 ),
-                                child: Text(
-                                  date.day.toString(),
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.black : (isToday ? Colors.deepPurple : Colors.black87),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                                child: const Icon(Icons.person_outline, color: AppColors.textPrimary, size: 20),
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Today's Section
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 15, 20, 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _selectedDay == _getDayName(DateTime.now().weekday) ? "Today's Exercises" : "$_selectedDay's Exercises",
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
                             ),
-                      ),
-                      TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const Saveexercise(isExtra: true)),
-                          );
-                        },
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
-                        label: const Text("Extra"),
-                        style: TextButton.styleFrom(foregroundColor: Colors.deepPurple),
-                      ),
-                    ],
-                  ),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-                  child: Row(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: const Text("All"),
-                          selected: _selectedPlanId == null,
-                          onSelected: (selected) {
-                            setState(() => _selectedPlanId = null);
-                          },
+                          ],
                         ),
-                      ),
-                      ...(planProvider.plansByDay[dayName] ?? []).map((plan) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(plan.planName),
-                            selected: _selectedPlanId == plan.planId,
-                            onSelected: (selected) {
-                              setState(() => _selectedPlanId = selected ? plan.planId : null);
-                            },
-                          ),
-                        );
-                      }).toList(),
-                      if (exerciseProvider.extraExercises.isNotEmpty && _selectedDay == _getDayName(DateTime.now().weekday))
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: const Text("Extra"),
-                            selected: _selectedPlanId == -1,
-                            onSelected: (selected) {
-                              setState(() => _selectedPlanId = selected ? -1 : null);
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          (exerciseProvider.todayExercises.isEmpty && 
-           (exerciseProvider.extraExercises.isEmpty || _selectedDay != _getDayName(DateTime.now().weekday)))
-              ? SliverToBoxAdapter(
-                  child: Container(
-                    height: 120,
-                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.grey[300]!),
+                      ],
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.event_note, color: Colors.grey, size: 30),
-                          const SizedBox(height: 8),
-                          Text(
-                            "No plans for $dayName",
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                        ],
+                    const SizedBox(height: 30),
+                    const Text(
+                      "Strivo",
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.0,
                       ),
                     ),
-                  ),
-                )
-              : SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final todayPlans = planProvider.plansByDay[dayName] ?? [];
-                      final bool isRealToday = _selectedDay == _getDayName(DateTime.now().weekday);
-                      
-                      // Combine exercises for the list
-                      List<dynamic> combinedList = [];
-                      
-                      if (_selectedPlanId == null) {
-                        combinedList.addAll(exerciseProvider.todayExercises);
-                        if (isRealToday) combinedList.addAll(exerciseProvider.extraExercises);
-                      } else if (_selectedPlanId == -1) {
-                        if (isRealToday) combinedList.addAll(exerciseProvider.extraExercises);
-                      } else {
-                        combinedList.addAll(exerciseProvider.todayExercises.where((e) => e.planId == _selectedPlanId));
-                      }
-
-                      if (index >= combinedList.length) return null;
-
-                      final exercise = combinedList[index];
-                      
-                      bool showHeader = false;
-                      String planName = "";
-                      
-                      if (_selectedPlanId == null) {
-                        if (exercise.isExtra) {
-                          planName = "Extra Workouts";
-                          // Check if this is the first extra exercise
-                          if (exerciseProvider.extraExercises.isNotEmpty && 
-                              exerciseProvider.extraExercises[0].id == exercise.id) {
-                            showHeader = true;
-                          }
-                        } else {
-                          final plan = todayPlans.firstWhere((p) => p.planId == exercise.planId, orElse: () => todayPlans.first);
-                          planName = plan.planName;
-                          int firstIndex = combinedList.indexWhere((e) => !e.isExtra && e.planId == exercise.planId);
-                          if (firstIndex == index) {
-                            showHeader = true;
-                          }
-                        }
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (showHeader)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 4,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: exercise.isExtra ? Colors.orange : Colors.deepPurple,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    planName,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: exercise.isExtra ? Colors.orange : Colors.deepPurple,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            child: Card(
-                              elevation: 0,
-                              color: exercise.isCheck ? Colors.green[50] : Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                                side: BorderSide(
-                                  color: exercise.isCheck ? Colors.green.withOpacity(0.2) : Colors.grey[200]!,
-                                  width: 1,
-                                ),
-                              ),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                title: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        exercise.name,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          decoration: exercise.isCheck ? TextDecoration.lineThrough : null,
-                                          color: exercise.isCheck ? Colors.grey : Colors.black87,
-                                        ),
-                                      ),
-                                    ),
-                                    if (exercise.isExtra && !exercise.isCheck)
-                                      IconButton(
-                                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                        onPressed: () {
-                                          exerciseProvider.deleteExercise(exercise.id!, -1);
-                                        },
-                                      ),
-                                  ],
-                                ),
-                                subtitle: Text(
-                                  "${exercise.sets} sets • ${exercise.reps} reps • ${exercise.weight}kg",
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                                trailing: Checkbox(
-                                  value: exercise.isCheck,
-                                  activeColor: Colors.green,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                  onChanged: (value) {
-                                    exercise.isCheck = value ?? false;
-                                    exerciseProvider.updateExercise(exercise);
-                                  },
-                                ),
-                                onTap: () async {
-                                  if (exercise.isCheck) {
-                                    // If completed, show reading mode with stored data
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ExerciseDetailsScreen(
-                                          exercise: exercise,
-                                          plan: exercise.isExtra 
-                                              ? Plan(planId: -1, planName: "Extra Workouts", planDay: _selectedDay)
-                                              : todayPlans.firstWhere((p) => p.planId == exercise.planId, orElse: () => todayPlans.first),
-                                        ),
-                                      ),
-                                    );
-                                  } else {
-                                    // If not completed, go straight to active workout
-                                    if (exercise.isExtra) {
-                                      await exerciseProvider.loadExercisesByPlan(-1);
-                                      if (context.mounted) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => WorkoutPlanPage(
-                                              plan: Plan(planId: -1, planName: "Extra Workouts", planDay: _selectedDay),
-                                              initialExerciseIndex: exerciseProvider.exercises.indexWhere((e) => e.id == exercise.id),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    } else {
-                                      final plan = todayPlans.firstWhere((p) => p.planId == exercise.planId, orElse: () => todayPlans.first);
-                                      await exerciseProvider.loadExercisesByPlan(plan.planId!);
-                                      int indexInPlan = exerciseProvider.exercises.indexWhere((e) => e.id == exercise.id);
-                                      if (context.mounted) {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => WorkoutPlanPage(
-                                              plan: plan,
-                                              initialExerciseIndex: indexInPlan != -1 ? indexInPlan : 0,
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }
-                                },
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                    childCount: _calculateChildCount(exerciseProvider),
-                  ),
-                ),
-
-          // Training Schedule (Days)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 25, 10, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Manage Schedule",
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                    Text(
+                      _getDayName(DateTime.now().weekday),
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        "Hello, ${authProvider.userName?.split(' ')[0] ?? 'User'}",
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 42,
+                          fontWeight: FontWeight.w900,
                         ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const SavePlan()));
-                    },
-                    icon: const Icon(Icons.add_circle, color: Colors.deepPurple, size: 30),
-                  ),
-                ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
               ),
             ),
-          ),
-          
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final day = _allDays[index];
-                final plansForDay = groupedPlans[day] ?? [];
-                final isToday = day == dayName;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => DayPlansScreen(day: day),
+            // Weekly Schedule Selector Header
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 40, 20, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Weekly Schedule",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(15),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(
-                          color: isToday ? Colors.deepPurple.withOpacity(0.3) : Colors.grey[200]!,
-                          width: isToday ? 2 : 1,
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 60,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const SavePlan()));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.add, color: Colors.black, size: 24),
                       ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: isToday ? Colors.deepPurple : Colors.grey[100],
-                            radius: 18,
-                            child: Text(
-                              day[0],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Weekly Schedule List
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 140,
+                child: ListView.builder(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _currentWeek.length,
+                  itemBuilder: (context, index) {
+                    final date = _currentWeek[index];
+                    final dayName = _getDayName(date.weekday);
+                    final isSelected = dayName == _selectedDay;
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedDay = dayName;
+                        });
+                        exerciseProvider.loadExercisesByDay(_selectedDay);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 75,
+                        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.transparent : AppColors.surface,
+                          borderRadius: BorderRadius.circular(25),
+                          border: isSelected
+                              ? Border.all(color: AppColors.accent, width: 2)
+                              : Border.all(color: Colors.transparent),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _getDayAbbr(date.weekday),
                               style: TextStyle(
-                                color: isToday ? Colors.white : Colors.grey[600],
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  day,
-                                  style: TextStyle(
-                                    fontWeight: isToday ? FontWeight.bold : FontWeight.w500,
-                                    fontSize: 16,
-                                    color: isToday ? Colors.deepPurple : Colors.black87,
-                                  ),
+                            const SizedBox(height: 15),
+                            Container(
+                              width: 40,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.accent : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                date.day.toString(),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
                                 ),
-                                Text(
-                                  "${plansForDay.length} Plans",
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                        ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Plans Header
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _selectedDay == _getDayName(DateTime.now().weekday)
+                          ? "Today's Plans"
+                          : "$_selectedDay's Plans",
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                );
-              },
-              childCount: _allDays.length,
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 60,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-        ],
+
+            (groupedPlans[dayName] == null || groupedPlans[dayName]!.isEmpty)
+                ? SliverToBoxAdapter(
+                    child: Container(
+                      height: 120,
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.event_note,
+                                color: AppColors.textSecondary, size: 30),
+                            const SizedBox(height: 8),
+                            Text(
+                              "No plans for $dayName",
+                              style: const TextStyle(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final plan = groupedPlans[dayName]![index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 8),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 15),
+                              leading: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.accent.withOpacity(0.2), width: 1),
+                                ),
+                                child: const Icon(Icons.fitness_center_rounded,
+                                    color: AppColors.accent, size: 24),
+                              ),
+                              title: Text(
+                                plan.planName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                  fontSize: 20,
+                                ),
+                              ),
+                              subtitle: const Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: Text(
+                                  "Tap to view exercises",
+                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                ),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2C2C2E),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.arrow_forward_ios_rounded,
+                                    size: 12, color: AppColors.textPrimary),
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        PlanDetailsScreen(plan: plan),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      childCount: groupedPlans[dayName]?.length ?? 0,
+                    ),
+                  ),
+
+            const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+          ],
+        ),
       ),
     );
   }
 
-  int _calculateChildCount(Exerciseprovider provider) {
-    final bool isRealToday = _selectedDay == _getDayName(DateTime.now().weekday);
-    if (_selectedPlanId == null) {
-      return provider.todayExercises.length + (isRealToday ? provider.extraExercises.length : 0);
-    } else if (_selectedPlanId == -1) {
-      return isRealToday ? provider.extraExercises.length : 0;
-    } else {
-      return provider.todayExercises.where((e) => e.planId == _selectedPlanId).length;
-    }
-  }
-
   String _getDayName(int weekday) {
+
     switch (weekday) {
       case 1: return "Monday";
       case 2: return "Tuesday";

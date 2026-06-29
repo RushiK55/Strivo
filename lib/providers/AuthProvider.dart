@@ -55,6 +55,9 @@ class AuthProvider with ChangeNotifier {
         await prefs.setString('user_name', _userName ?? "");
         await prefs.setString('user_email', _userEmail ?? "");
         
+        final profile = await UserManager.getProfile();
+        _isProfileComplete = profile['isComplete'];
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -81,6 +84,9 @@ class AuthProvider with ChangeNotifier {
         await prefs.setString('user_uid', _uid!);
         await prefs.setString('user_name', _userName ?? "");
         await prefs.setString('user_email', _userEmail ?? "");
+
+        final profile = await UserManager.getProfile();
+        _isProfileComplete = profile['isComplete'];
 
         _isLoading = false;
         notifyListeners();

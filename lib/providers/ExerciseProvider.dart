@@ -1,17 +1,43 @@
 import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/Exercise.dart';
+import '../models/workout_session.dart';
 import '../database/database_helper.dart';
 
 class Exerciseprovider extends ChangeNotifier {
   List<Exercise> _exercises = [];
   List<Exercise> _todayExercises = [];
   List<Exercise> _extraExercises = [];
+  List<WorkoutSession> _history = [];
   String _currentLoadedDay = "";
 
   List<Exercise> get exercises => _exercises;
   List<Exercise> get todayExercises => _todayExercises;
   List<Exercise> get extraExercises => _extraExercises;
+  List<WorkoutSession> get history => _history;
+
+  Future<void> fetchHistory() async {
+    final sessionMaps = await DatabaseHelper.instance.getWorkoutSessions();
+    _history = sessionMaps.map((map) => WorkoutSession.fromMap(map)).toList();
+    notifyListeners();
+  }
+
+  Future<void> saveCompletedWorkout(String planName, String duration) async {
+    List<PerformedExercise> performed = _exercises.map((ex) => PerformedExercise(
+      name: ex.name,
+      sets: ex.setsList.map((s) => s.toMap()).toList()
+    )).toList();
+
+    WorkoutSession newSession = WorkoutSession(
+      planName: planName,
+      date: DateTime.now(),
+      totalTime: duration,
+      exercises: performed
+    );
+
+    await DatabaseHelper.instance.saveSession(newSession.toMap());
+    await fetchHistory();
+  }
 
   Future<void> loadAllExercises() async {
     _exercises = await DatabaseHelper.instance.readAllExercises();

@@ -6,6 +6,7 @@ import 'package:strivo/Screens/OnboardingScreen.dart';
 import 'package:strivo/providers/ExerciseProvider.dart';
 import 'package:strivo/providers/PlanProvider.dart';
 import 'package:strivo/providers/AuthProvider.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,14 +31,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          primary: Colors.deepPurple,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: AppColors.background,
+        colorScheme: const ColorScheme.dark(
+          primary: AppColors.accent,
+          surface: AppColors.surface,
+          onSurface: AppColors.textPrimary,
         ),
         appBarTheme: const AppBarTheme(
           centerTitle: true,
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
+          backgroundColor: AppColors.background,
+          foregroundColor: AppColors.textPrimary,
           elevation: 0,
         ),
       ),

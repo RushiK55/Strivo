@@ -21,7 +21,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6, // Bumped version to 6 for Exercise Rest Time
+      version: 7, // Bumped version to 7 for workout_sessions
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -53,6 +53,17 @@ class DatabaseHelper {
     if (oldVersion < 6) {
       await db.execute('ALTER TABLE exercises ADD COLUMN restTime TEXT DEFAULT ""');
       await db.execute('ALTER TABLE history ADD COLUMN restTime TEXT DEFAULT ""');
+    }
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS workout_sessions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          planName TEXT,
+          date TEXT,
+          totalTime TEXT,
+          exercises TEXT
+        )
+      ''');
     }
   }
 
@@ -95,7 +106,18 @@ class DatabaseHelper {
         setsData TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE workout_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        planName TEXT,
+        date TEXT,
+        totalTime TEXT,
+        exercises TEXT
+      )
+    ''');
   }
+
 
   // --- CRUD for PLANS ---
 
@@ -238,7 +260,8 @@ class DatabaseHelper {
         'setsData': '', // Clear the sets logged in the previous session
         'weight': '0',
         'sets': '0',
-        'reps': '0'
+        'reps': '0',
+        'restTime': ''
       },
     );
   }
@@ -317,7 +340,19 @@ class DatabaseHelper {
     return await db.query('history', orderBy: 'completedAt DESC');
   }
 
+  // --- Workout Sessions ---
+  Future<int> saveSession(Map<String, dynamic> session) async {
+    final db = await instance.database;
+    return await db.insert('workout_sessions', session);
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkoutSessions() async {
+    final db = await instance.database;
+    return await db.query('workout_sessions', orderBy: 'date DESC');
+  }
+
   Future close() async {
+
     final db = await instance.database;
     db.close();
   }

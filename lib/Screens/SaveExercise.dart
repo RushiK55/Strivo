@@ -4,6 +4,7 @@ import 'package:strivo/models/Exercise.dart';
 import 'package:strivo/models/Plan.dart';
 import 'package:strivo/providers/ExerciseProvider.dart';
 import '../widgets/wheel_picker.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class Saveexercise extends StatefulWidget {
   final Plan? plan; // Optional for extra exercises
@@ -26,6 +27,11 @@ class _SaveexerciseState extends State<Saveexercise> {
   final TextEditingController _exerciseNameController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
+  int _sets = 3;
+  int _reps = 10;
+  int _weightInt = 40;
+  int _weightDec = 0;
+
   bool _vanishEndOfDay = false;
 
   @override
@@ -35,6 +41,12 @@ class _SaveexerciseState extends State<Saveexercise> {
       _exerciseNameController.text = widget.exercise!.name;
       _notesController.text = widget.exercise!.notes;
       _vanishEndOfDay = widget.exercise!.vanishEndOfDay;
+      
+      _sets = int.tryParse(widget.exercise!.sets) ?? 3;
+      _reps = int.tryParse(widget.exercise!.reps) ?? 10;
+      double w = double.tryParse(widget.exercise!.weight) ?? 40.0;
+      _weightInt = w.floor();
+      _weightDec = ((w - _weightInt) * 10).round();
     }
   }
 
@@ -50,30 +62,37 @@ class _SaveexerciseState extends State<Saveexercise> {
     final exerciseProvider = Provider.of<Exerciseprovider>(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
-          widget.exercise == null 
-            ? (widget.isExtra ? "Extra Workout" : "New Exercise") 
-            : "Edit Exercise", 
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 22)
-        ),
+            widget.exercise == null
+                ? (widget.isExtra ? "Extra Workout" : "New Exercise")
+                : "Edit Exercise",
+            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               _buildSectionTitle("Exercise Detail"),
               _buildNameField(),
+              
+              const SizedBox(height: 30),
+              _buildSectionTitle("Target Metrics"),
+              _buildTargetMetricsPickers(),
               
               if (widget.isExtra) ...[
                 const SizedBox(height: 30),
@@ -85,7 +104,7 @@ class _SaveexerciseState extends State<Saveexercise> {
               _buildSectionTitle("Extra Notes"),
               _buildNotesField(),
               
-              const SizedBox(height: 40),
+              const SizedBox(height: 60),
               _buildSaveButton(exerciseProvider),
               const SizedBox(height: 30),
             ],
@@ -95,39 +114,125 @@ class _SaveexerciseState extends State<Saveexercise> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 12),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[600],
-          letterSpacing: 1.2,
+  Widget _buildTargetMetricsPickers() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            WheelPicker(
+              label: "SETS",
+              minValue: 1,
+              maxValue: 20,
+              initialValue: _sets,
+              onChanged: (val) => setState(() => _sets = val),
+              width: 65,
+            ),
+            const SizedBox(width: 15),
+            WheelPicker(
+              label: "REPS",
+              minValue: 1,
+              maxValue: 100,
+              initialValue: _reps,
+              onChanged: (val) => setState(() => _reps = val),
+              width: 65,
+            ),
+            const SizedBox(width: 15),
+            Row(
+              children: [
+                WheelPicker(
+                  label: "WEIGHT (KG)",
+                  minValue: 0,
+                  maxValue: 500,
+                  initialValue: _weightInt,
+                  onChanged: (val) => setState(() => _weightInt = val),
+                  width: 75,
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Text(".",
+                      style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary)),
+                ),
+                WheelPicker(
+                  label: "",
+                  minValue: 0,
+                  maxValue: 9,
+                  initialValue: _weightDec,
+                  onChanged: (val) => setState(() => _weightDec = val),
+                  width: 55,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          width: 40,
+          height: 3,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
   Widget _buildNameField() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8)),
-        ],
+        border: Border.all(color: const Color(0xFF2C2C2E)),
       ),
       child: TextFormField(
         controller: _exerciseNameController,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary),
         decoration: InputDecoration(
-          hintText: "Enter exercise name...",
-          hintStyle: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.normal),
-          prefixIcon: const Icon(Icons.fitness_center, color: Colors.deepPurple),
+          hintText: "e.g. Bench Press",
+          hintStyle: const TextStyle(
+              color: Color(0xFF5E5E5E), fontWeight: FontWeight.normal, fontSize: 16),
+          prefixIcon: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.fitness_center_rounded, color: AppColors.accent, size: 20),
+          ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         ),
         validator: (value) => value == null || value.isEmpty ? 'Required' : null,
       ),
@@ -137,18 +242,20 @@ class _SaveexerciseState extends State<Saveexercise> {
   Widget _buildVanishToggle() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8)),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
       ),
       child: SwitchListTile(
-        title: const Text("Vanish at end of day", style: TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: const Text("Keep your dashboard clean tomorrow"),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        title: const Text("Vanish at end of day",
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        subtitle: const Text("Keep your dashboard clean tomorrow",
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         value: _vanishEndOfDay,
         onChanged: (val) => setState(() => _vanishEndOfDay = val),
-        activeColor: Colors.deepPurple,
+        activeColor: AppColors.accent,
+        activeTrackColor: AppColors.accent.withOpacity(0.3),
       ),
     );
   }
@@ -156,50 +263,41 @@ class _SaveexerciseState extends State<Saveexercise> {
   Widget _buildNotesField() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 15, offset: const Offset(0, 8)),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
       ),
       child: TextFormField(
         controller: _notesController,
         maxLines: 4,
-        style: const TextStyle(fontSize: 15),
-        decoration: InputDecoration(
-          hintText: "Add training notes here...",
-          hintStyle: TextStyle(color: Colors.grey[400]),
+        style: const TextStyle(fontSize: 16, color: AppColors.textPrimary),
+        decoration: const InputDecoration(
+          hintText: "Add specific training tips or cues...",
+          hintStyle: TextStyle(color: Color(0xFF5E5E5E), fontSize: 15),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.all(20),
+          contentPadding: EdgeInsets.all(24),
         ),
       ),
     );
   }
 
   Widget _buildSaveButton(Exerciseprovider provider) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      height: 65,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF673AB7), Color(0xFF512DA8)],
-        ),
-        boxShadow: [
-          BoxShadow(color: Colors.deepPurple.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 6)),
-        ],
-      ),
+      height: 60,
       child: ElevatedButton(
         onPressed: () async {
           if (_formKey.currentState!.validate()) {
+            double finalWeight = _weightInt + (_weightDec / 10.0);
+            
             if (widget.exercise == null) {
               await provider.addExercise(
                 Exercise(
                   planId: widget.plan?.planId ?? -1,
                   name: _exerciseNameController.text,
-                  weight: "0",
-                  sets: "0",
-                  reps: "0",
+                  weight: finalWeight.toString(),
+                  sets: _sets.toString(),
+                  reps: _reps.toString(),
                   notes: _notesController.text,
                   isExtra: widget.isExtra,
                   vanishEndOfDay: _vanishEndOfDay,
@@ -211,19 +309,26 @@ class _SaveexerciseState extends State<Saveexercise> {
               e.name = _exerciseNameController.text;
               e.notes = _notesController.text;
               e.vanishEndOfDay = _vanishEndOfDay;
+              e.sets = _sets.toString();
+              e.reps = _reps.toString();
+              e.weight = finalWeight.toString();
               await provider.updateExercise(e);
             }
             if (mounted) Navigator.pop(context);
           }
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 0,
         ),
         child: Text(
           widget.exercise == null ? "FINISH & SAVE" : "UPDATE EXERCISE",
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 1.5),
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.2),
         ),
       ),
     );

@@ -1,71 +1,116 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/Exercise.dart';
+import '../models/workout_session.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class HistoryDetailsScreen extends StatelessWidget {
-  final Map<String, dynamic> historyItem;
+  final WorkoutSession session;
 
-  const HistoryDetailsScreen({super.key, required this.historyItem});
+  const HistoryDetailsScreen({super.key, required this.session});
 
   @override
   Widget build(BuildContext context) {
-    // Reconstruct exercise to use its helper methods/decoding logic
-    final exercise = Exercise.fromMap(historyItem);
-    final DateTime completedAt = DateTime.parse(historyItem['completedAt']);
-    
-    double totalVolume = exercise.setsList.fold(0, (sum, s) => sum + (s.weight * s.reps));
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FE),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text("Workout Details", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text("Session Recap",
+            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontSize: 20)),
         centerTitle: true,
+        elevation: 0,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.arrow_back_ios_new, size: 16, color: AppColors.textPrimary),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(exercise, completedAt),
-            const SizedBox(height: 24),
-            _buildSummaryCards(exercise, totalVolume),
+            _buildHeader(session.planName, session.date),
             const SizedBox(height: 30),
-            const Text(
-              "COMPLETED SETS",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2),
+            _buildSummaryCards(session),
+            const SizedBox(height: 40),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "WORKOUT BREAKDOWN",
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      letterSpacing: 2.0),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: 40,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            _buildSetsList(exercise),
+            const SizedBox(height: 24),
+            _buildExerciseList(session),
+            const SizedBox(height: 50),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(Exercise exercise, DateTime date) {
+  Widget _buildHeader(String planName, DateTime date) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF2C2C2E)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            exercise.name,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            planName,
+            style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+                letterSpacing: 1.0),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.calendar_today_rounded,
+                    size: 14, color: AppColors.accent),
+              ),
+              const SizedBox(width: 10),
               Text(
-                DateFormat('EEEE, d MMMM yyyy • h:mm a').format(date),
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                DateFormat('EEEE, d MMM yyyy • h:mm a').format(date),
+                style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500),
               ),
             ],
           ),
@@ -74,12 +119,17 @@ class HistoryDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCards(Exercise exercise, double volume) {
+  Widget _buildSummaryCards(WorkoutSession session) {
     return Row(
       children: [
-        _buildStatCard("Sets", exercise.setsList.length.toString(), Icons.layers_outlined, Colors.blue),
-        const SizedBox(width: 12),
-        _buildStatCard("Volume", "${volume.toStringAsFixed(1)} kg", Icons.fitness_center, Colors.orange),
+        _buildStatCard(
+            "Exercises",
+            session.exercises.length.toString(),
+            Icons.fitness_center_rounded,
+            AppColors.accent),
+        const SizedBox(width: 16),
+        _buildStatCard("Total Time", session.totalTime, Icons.timer_outlined,
+            AppColors.accent),
       ],
     );
   }
@@ -87,61 +137,131 @@ class HistoryDetailsScreen extends StatelessWidget {
   Widget _buildStatCard(String label, String value, IconData icon, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: const Color(0xFF2C2C2E)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 12),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(height: 16),
+            Text(label.toUpperCase(),
+                style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2)),
+            const SizedBox(height: 6),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSetsList(Exercise exercise) {
+  Widget _buildExerciseList(WorkoutSession session) {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: exercise.setsList.length,
+      itemCount: session.exercises.length,
       itemBuilder: (context, index) {
-        final set = exercise.setsList[index];
+        final exercise = session.exercises[index];
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: const Color(0xFF2C2C2E)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: const Color(0xFFD0FD3E),
-                child: Text("${index + 1}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black)),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.check_circle_outline_rounded,
+                        color: AppColors.accent, size: 22),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(exercise.name,
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary)),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("${set.weight} kg × ${set.reps} reps", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    if (set.restTime.isNotEmpty && set.restTime != "00:00:00")
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text("Rest: ${set.restTime}", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Divider(color: Color(0xFF2C2C2E), thickness: 1.5),
+              ),
+              ...exercise.sets.asMap().entries.map((entry) {
+                int setIdx = entry.key;
+                var setData = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2C2C2E),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text("SET ${setIdx + 1}",
+                            style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0)),
                       ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                              "${setData['weight']} KG × ${setData['reps']} REPS",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: AppColors.textPrimary,
+                                  letterSpacing: 0.5)),
+                          if (setData['setDuration'] != null &&
+                              setData['setDuration'].isNotEmpty &&
+                              setData['setDuration'] != "00:00:00")
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text("Time: ${setData['setDuration']}",
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary, fontSize: 12)),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ],
           ),
         );

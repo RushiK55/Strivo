@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:strivo/utils/app_colors.dart';
 
 class WheelPicker extends StatefulWidget {
   final int minValue;
@@ -74,28 +75,21 @@ class _WheelPickerState extends State<WheelPicker> {
         if (widget.label.isNotEmpty) ...[
           Text(
             widget.label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: Colors.deepPurple.withOpacity(0.7),
-              letterSpacing: 0.5,
+              color: AppColors.textSecondary,
+              letterSpacing: 1.0,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
         ],
         Container(
           height: 160,
           width: widget.width,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(25),
           ),
           child: Stack(
             children: [
@@ -103,10 +97,11 @@ class _WheelPickerState extends State<WheelPicker> {
               Center(
                 child: Container(
                   height: 45,
-                  width: widget.width - 10,
+                  width: widget.width - 12,
                   decoration: BoxDecoration(
-                    color: Colors.deepPurple.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: AppColors.accent.withOpacity(0.3)),
                   ),
                 ),
               ),
@@ -123,9 +118,9 @@ class _WheelPickerState extends State<WheelPicker> {
                       child: Text(
                         '${widget.minValue + index}',
                         style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     );
