@@ -18,3 +18,12 @@ captures/
 *.apk
 *.aab
 .DS_Store
+
+# Secrets and signing: never commit these
+app/google-services.json
+google-services.json
+*.jks
+*.keystore
+keystore.properties
+.env
+*.pem

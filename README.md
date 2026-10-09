@@ -51,3 +51,9 @@ One-time setup in the Firebase console for this project:
 2. **Rules**: paste the contents of `firestore.rules` and publish.
 
 Until that is done the app still works fully offline, and Profile → "Cloud sync" shows what is wrong.
+
+## Firebase config (not in git)
+
+`app/google-services.json` holds this project's Firebase settings and API key, so it is git-ignored.
+Download your own copy from the Firebase console (Project settings → Your apps → Android) and put it in `app/`.
+`app/google-services.json.example` shows the expected shape.

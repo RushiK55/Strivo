@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "73683770582",
-    "project_id": "gyms-548d3",
-    "storage_bucket": "gyms-548d3.firebasestorage.app"
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "your-project-id",
+    "storage_bucket": "your-project-id.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:73683770582:android:461fb69e6abb0eba04fd77",
+        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID",
         "android_client_info": {
           "package_name": "strivo.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBLc9PnRSlbljI0wN5YIdCtQgtuQIy-rT4"
+          "current_key": "YOUR_API_KEY"
         }
       ],
       "services": {
