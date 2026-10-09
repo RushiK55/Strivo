@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EventBusy
 import androidx.compose.material.icons.rounded.Equalizer
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Height
@@ -70,15 +71,18 @@ import com.example.strivo.ui.components.AccentTitle
 import com.example.strivo.ui.components.CircleBackButton
 import com.example.strivo.ui.components.DecimalWheelPicker
 import com.example.strivo.data.sync.SyncStatus
+import com.example.strivo.ui.components.RestDayPicker
 import com.example.strivo.ui.components.StrivoAlertDialog
+import com.example.strivo.ui.components.restDaysSummary
 import com.example.strivo.ui.components.WheelPicker
 import com.example.strivo.ui.theme.AppColors
 import com.example.strivo.util.fixed1
 import com.example.strivo.viewmodel.AuthViewModel
 import com.example.strivo.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 
-private enum class ProfileEdit { Gender, Age, Height, Weight }
+private enum class ProfileEdit { Gender, Age, Height, Weight, RestDays }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -162,6 +166,8 @@ fun ProfileScreen(
                     DetailRow("Height", "${profile.height?.fixed1() ?: "--"} cm", Icons.Rounded.Height) { editing = ProfileEdit.Height }
                     HorizontalDivider(Modifier.padding(start = 60.dp), color = AppColors.Field)
                     DetailRow("Weight", "${profile.weight?.fixed1() ?: "--"} kg", Icons.Rounded.MonitorWeight) { editing = ProfileEdit.Weight }
+                    HorizontalDivider(Modifier.padding(start = 60.dp), color = AppColors.Field)
+                    DetailRow("Rest days", restDaysSummary(profile.restDays), Icons.Rounded.EventBusy) { editing = ProfileEdit.RestDays }
                 }
                 Spacer(Modifier.height(40.dp))
 
@@ -212,6 +218,15 @@ fun ProfileScreen(
     // --- Edit dialogs ---
 
     when (editing) {
+        ProfileEdit.RestDays -> RestDaysSheet(
+            initial = profile.restDays,
+            onDismiss = { editing = null },
+            onSave = { days ->
+                editing = null
+                save { profileViewModel.saveRestDays(days) }
+            },
+        )
+
         ProfileEdit.Gender -> GenderSheet(
             initial = profile.gender ?: "Male",
             onDismiss = { editing = null },
@@ -540,6 +555,43 @@ private fun SyncRow(status: SyncStatus, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(title, color = AppColors.TextPrimary, fontWeight = FontWeight.Medium)
             Text(detail, color = AppColors.TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RestDaysSheet(initial: Set<DayOfWeek>, onDismiss: () -> Unit, onSave: (Set<DayOfWeek>) -> Unit) {
+    var selected by remember { mutableStateOf(initial) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = AppColors.Surface,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Rest days", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "A rest day without a workout won't break your streak. Pick any days, or none.",
+                fontSize = 14.sp,
+                color = AppColors.TextSecondary,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(24.dp))
+            RestDayPicker(selected = selected, onChange = { selected = it })
+            Spacer(Modifier.height(32.dp))
+            AccentButton(
+                text = "SAVE CHANGES",
+                onClick = { onSave(selected) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

@@ -119,6 +119,7 @@ import com.example.strivo.viewmodel.WorkoutViewModel
 import com.example.strivo.viewmodel.formatWeight
 
 private const val ZeroTime = "00:00:00"
+private const val ZeroTimeMinSec = "00:00"
 
 private sealed interface Picker {
     data class Weight(val exerciseIndex: Int, val setIndex: Int, val initial: Double) : Picker
@@ -140,6 +141,7 @@ fun WorkoutScreen(
     var summaryExerciseIndex by remember { mutableStateOf<Int?>(null) }
     var showComplete by remember { mutableStateOf(false) }
     var workoutFinished by remember { mutableStateOf(false) }
+    var focusOpen by remember { mutableStateOf(false) }
     var showFinishEarly by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
     val hasProgress = state.exercises.any { ex -> ex.setsList.any { it.isCompleted } }
@@ -157,6 +159,8 @@ fun WorkoutScreen(
                 )
 
                 is WorkoutEvent.ShowSummary -> summaryExerciseIndex = event.exerciseIndex
+                WorkoutEvent.FocusOnNextSet -> focusOpen = true
+
                 WorkoutEvent.ShowComplete -> {
                     workoutFinished = true
                     showComplete = true
@@ -167,7 +171,6 @@ fun WorkoutScreen(
 
     // Focus mode: once a set is started the list is blurred and one big button drives the workout -
     // STOP while a set runs, then START for the next set - until the user closes it or the workout ends.
-    var focusOpen by remember { mutableStateOf(false) }
     val isSetActive = state.activeSetIndex != null
     LaunchedEffect(isSetActive) { if (isSetActive) focusOpen = true }
     LaunchedEffect(workoutFinished) { if (workoutFinished) focusOpen = false }
@@ -441,7 +444,7 @@ private fun WorkoutTimerHeader(viewModel: WorkoutViewModel, isRunning: Boolean, 
                 Text(
                     text = when {
                         isRunning -> "PAUSE"
-                        workoutTime != "00:00:00" -> "RESUME"
+                        workoutTime != ZeroTime -> "RESUME"
                         else -> "START"
                     },
                     color = Color.Black,
@@ -471,7 +474,7 @@ private fun GlobalRestIndicator(viewModel: WorkoutViewModel) {
     ) {
         Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.Warning, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(12.dp))
-        Text("SET REST: $restTime", color = AppColors.Warning, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Text("RESTING BEFORE NEXT SET: $restTime", color = AppColors.Warning, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         Spacer(Modifier.weight(1f))
         TextButton(onClick = viewModel::stopRest) { Text("SKIP", color = AppColors.Warning) }
     }
@@ -497,23 +500,11 @@ private fun PostExerciseRest(index: Int, exercise: Exercise, viewModel: WorkoutV
         ) {
             Icon(Icons.Outlined.Timer, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
-            Text("RESTING BEFORE NEXT", color = AppColors.Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text("RESTING BEFORE NEXT EXERCISE", color = AppColors.Accent, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             Spacer(Modifier.weight(1f))
             Text(restTime, color = AppColors.Accent, fontWeight = FontWeight.Black, fontSize = 18.sp)
-            Spacer(Modifier.width(16.dp))
-            Text(
-                "SKIP",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(AppColors.Accent)
-                    .clickable(onClick = viewModel::stopRest)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            )
         }
-    } else if (exercise.isCheck && exercise.restTime.isNotEmpty() && exercise.restTime != ZeroTime) {
+    } else if (exercise.isCheck && exercise.restTime.isNotEmpty() && exercise.restTime != ZeroTimeMinSec) {
         Row(
             modifier = Modifier
                 .padding(bottom = 12.dp)
@@ -671,7 +662,7 @@ private fun SetRow(
     val isResting = state.showRestTimer &&
         state.activeRestExerciseIndex == exerciseIndex &&
         state.activeRestSetIndex == setIndex
-    val hasDuration = set.setDuration.isNotEmpty() && set.setDuration != ZeroTime
+    val hasDuration = set.setDuration.isNotEmpty() && set.setDuration != ZeroTimeMinSec
     val shape = RoundedCornerShape(15.dp)
 
     Column {
@@ -769,7 +760,7 @@ private fun SetRow(
 
         if (isResting) {
             RestTimeRow(time = null, viewModel = viewModel)
-        } else if (set.isCompleted && set.restTime.isNotEmpty() && set.restTime != ZeroTime) {
+        } else if (set.isCompleted && set.restTime.isNotEmpty() && set.restTime != ZeroTimeMinSec) {
             RestTimeRow(time = set.restTime, viewModel = viewModel)
         }
     }
@@ -804,7 +795,7 @@ private fun RestTimeRow(time: String?, viewModel: WorkoutViewModel) {
         Icon(Icons.Outlined.HourglassEmpty, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            text = if (isLive) "Resting..." else "Rest: $time",
+            text = if (isLive) "Resting before next set..." else "Rest: $time",
             fontSize = 12.sp,
             color = color,
             fontWeight = if (isLive) FontWeight.Bold else FontWeight.Normal,
@@ -1014,9 +1005,13 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
         val state by viewModel.state.collectAsStateWithLifecycle()
         val canStart = info.isRunning || info.reps > 0
         val isResting = state.showRestTimer && !info.isRunning
+        val paused = state.isPaused
+        val restingBetweenExercises = isResting && state.isExerciseRest
+        var editing by remember { mutableStateOf<MetricEdit?>(null) }
 
         val buttonColor by animateColorAsState(
             when {
+                paused -> AppColors.Accent
                 info.isRunning -> AppColors.WarningAccent
                 canStart -> AppColors.Accent
                 else -> AppColors.Field
@@ -1038,6 +1033,23 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
             label = "setPulseScale",
         )
 
+        // The same wheel pickers as in the exercise list, opened by tapping the weight or reps.
+        when (editing) {
+            MetricEdit.Weight -> WeightPickerDialog(
+                initial = info.weight,
+                onDismiss = { editing = null },
+                onSelected = { viewModel.setWeight(info.exerciseIndex, info.setIndex, it); editing = null },
+            )
+
+            MetricEdit.Reps -> RepsPickerDialog(
+                initial = if (info.reps == 0) 10 else info.reps,
+                onDismiss = { editing = null },
+                onSelected = { viewModel.setReps(info.exerciseIndex, info.setIndex, it); editing = null },
+            )
+
+            null -> Unit
+        }
+
         Box(Modifier.fillMaxSize().systemBarsPadding()) {
             IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                 Icon(Icons.Rounded.Close, contentDescription = "Show exercise list", tint = AppColors.TextPrimary)
@@ -1058,7 +1070,7 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "SET ${info.setIndex + 1} OF ${info.setCount}",
+                    if (restingBetweenExercises) "UP NEXT · SET ${info.setIndex + 1} OF ${info.setCount}" else "SET ${info.setIndex + 1} OF ${info.setCount}",
                     color = AppColors.Accent,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -1066,11 +1078,12 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                 )
                 Spacer(Modifier.height(6.dp))
                 Spacer(Modifier.height(20.dp))
-                // The weight and reps of this set, big. Change them with − / + (the set can differ from the plan);
-                // every change is saved at once, and stopping the set saves the set with these values.
+                // The weight and reps of this set. The set can differ from the plan: tap a value to pick it on the wheel,
+                // or nudge it with the round buttons. Every change is saved at once, and stopping the set saves it.
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricStepper(
                         label = "KG",
+                        onEdit = { editing = MetricEdit.Weight },
                         value = if (info.weight == 0.0) "BW" else formatWeight(info.weight),
                         onMinus = { viewModel.setWeight(info.exerciseIndex, info.setIndex, (info.weight - WeightStep).coerceAtLeast(0.0)) },
                         onPlus = { viewModel.setWeight(info.exerciseIndex, info.setIndex, info.weight + WeightStep) },
@@ -1078,6 +1091,7 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                     )
                     MetricStepper(
                         label = "REPS",
+                        onEdit = { editing = MetricEdit.Reps },
                         value = if (info.reps > 0) info.reps.toString() else "--",
                         onMinus = { viewModel.setReps(info.exerciseIndex, info.setIndex, (info.reps - 1).coerceAtLeast(0)) },
                         onPlus = { viewModel.setReps(info.exerciseIndex, info.setIndex, info.reps + 1) },
@@ -1096,6 +1110,28 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                     )
                 }
                 Spacer(Modifier.height(24.dp))
+                // What the clock below is counting: rest between sets or between exercises, or a paused workout.
+                val badge = when {
+                    paused -> "PAUSED"
+                    restingBetweenExercises -> "EXERCISE REST"
+                    isResting -> "REST BETWEEN SETS"
+                    else -> null
+                }
+                if (badge != null) {
+                    val badgeColor = if (paused) AppColors.Warning else AppColors.Accent
+                    Text(
+                        text = badge,
+                        color = badgeColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(badgeColor.copy(alpha = 0.15f))
+                            .padding(horizontal = 12.dp, vertical = 5.dp),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                }
                 Text(
                     text = when {
                         info.isRunning -> setTime
@@ -1110,7 +1146,7 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                 Text(
                     text = when {
                         info.isRunning -> "SET TIME"
-                        isResting -> "REST"
+                        isResting -> if (state.isExerciseRest) "REST BEFORE NEXT EXERCISE" else "REST BEFORE NEXT SET"
                         else -> "GET SET"
                     },
                     color = AppColors.TextSecondary,
@@ -1120,7 +1156,7 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                 )
                 Spacer(Modifier.height(40.dp))
                 Box(contentAlignment = Alignment.Center) {
-                    if (info.isRunning) {
+                    if (info.isRunning && !paused) {
                         // Soft ring that keeps growing outwards and fading while the set runs.
                         Box(
                             Modifier
@@ -1144,14 +1180,22 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                             .background(buttonColor)
                             .clickable {
                                 // A set without reps cannot start: send the user back to the list to fill it in.
-                                if (canStart) viewModel.onSetButton(info.exerciseIndex, info.setIndex) else onClose()
+                                when {
+                                    paused -> viewModel.startStopWorkout() // resume everything that was frozen
+                                    canStart -> viewModel.onSetButton(info.exerciseIndex, info.setIndex)
+                                    else -> onClose()
+                                }
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (canStart) {
+                        if (canStart || paused) {
                             Icon(
-                                imageVector = if (info.isRunning) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
-                                contentDescription = if (info.isRunning) "Finish set" else "Start set",
+                                imageVector = if (info.isRunning && !paused) Icons.Rounded.Stop else Icons.Rounded.PlayArrow,
+                                contentDescription = when {
+                                    paused -> "Resume"
+                                    info.isRunning -> "Finish set"
+                                    else -> "Start set"
+                                },
                                 tint = Color.Black,
                                 modifier = Modifier.size(104.dp),
                             )
@@ -1163,6 +1207,7 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                 Spacer(Modifier.height(24.dp))
                 Text(
                     text = when {
+                        paused -> "TAP TO RESUME"
                         info.isRunning -> "TAP TO FINISH SET"
                         canStart -> "TAP TO START SET"
                         else -> "TAP TO OPEN THE LIST"
@@ -1172,6 +1217,22 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
                 )
+                // The same pause as the main button on the list: it freezes the workout, set and rest clocks together.
+                if (state.isWorkoutRunning) {
+                    Spacer(Modifier.height(20.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(AppColors.Surface.copy(alpha = 0.85f))
+                            .clickable { viewModel.startStopWorkout() }
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Pause, contentDescription = null, tint = AppColors.Warning, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("PAUSE WORKOUT", color = AppColors.Warning, fontWeight = FontWeight.Bold, fontSize = 13.sp, letterSpacing = 1.sp)
+                    }
+                }
             }
         }
     }
@@ -1179,35 +1240,57 @@ private fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutV
 
 private const val WeightStep = 2.5
 
-/** A big number with − and + beside it, used on the focus screen for the weight and reps of the current set. */
+private enum class MetricEdit { Weight, Reps }
+
+/**
+ * The weight or reps of the current set, big, in the style of the rest of the app: tap the value to pick it on the
+ * same wheel as in the exercise list, or nudge it with the round buttons (accent "+" like the add buttons elsewhere).
+ */
 @Composable
-private fun MetricStepper(label: String, value: String, onMinus: () -> Unit, onPlus: () -> Unit, modifier: Modifier = Modifier) {
+private fun MetricStepper(
+    label: String,
+    value: String,
+    onEdit: () -> Unit,
+    onMinus: () -> Unit,
+    onPlus: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(20.dp)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(AppColors.Surface.copy(alpha = 0.85f))
-            .padding(horizontal = 6.dp, vertical = 10.dp),
+            .clip(shape)
+            .background(AppColors.Surface)
+            .border(BorderStroke(1.dp, AppColors.Field), shape)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StepperButton(Icons.Rounded.Remove, "Decrease $label", onMinus)
-        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, color = AppColors.TextPrimary, fontSize = 32.sp, fontWeight = FontWeight.Black, maxLines = 1)
-            Text(label, color = AppColors.TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+        StepperButton(Icons.Rounded.Remove, "Decrease $label", onMinus, accent = false)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onEdit)
+                .drawUnderline(AppColors.SetBorder)
+                .padding(vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(label, color = AppColors.TextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text(value, color = AppColors.TextPrimary, fontSize = 30.sp, fontWeight = FontWeight.Black, maxLines = 1)
         }
-        StepperButton(Icons.Rounded.Add, "Increase $label", onPlus)
+        StepperButton(Icons.Rounded.Add, "Increase $label", onPlus, accent = true)
     }
 }
 
+/** Round buttons like the ones used across the app: the "+" is accent-filled, the "−" is the soft grey. */
 @Composable
-private fun StepperButton(icon: ImageVector, description: String, onClick: () -> Unit) {
+private fun StepperButton(icon: ImageVector, description: String, onClick: () -> Unit, accent: Boolean) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(38.dp)
             .clip(CircleShape)
-            .background(AppColors.Field)
+            .background(if (accent) AppColors.Accent else AppColors.Field)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = description, tint = AppColors.Accent, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = description, tint = if (accent) Color.Black else AppColors.TextPrimary, modifier = Modifier.size(20.dp))
     }
 }

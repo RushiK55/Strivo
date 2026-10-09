@@ -10,3 +10,6 @@ data class Plan(
 ) {
     val isPrebuilt: Boolean get() = planDay == PREBUILT_DAY
 }
+
+/** The plan a day's extra exercises (done on top of, or instead of, the planned ones) are collected in. */
+const val EXTRA_PLAN_NAME = "Extra exercises"

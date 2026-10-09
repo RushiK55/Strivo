@@ -3,6 +3,7 @@ package com.example.strivo.data.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.strivo.util.todayIso
+import java.time.DayOfWeek
 
 data class UserProfile(
     val gender: String? = null,
@@ -12,6 +13,8 @@ data class UserProfile(
     val highWeight: Double? = null,
     val lowWeight: Double? = null,
     val isComplete: Boolean = false,
+    /** Days off the gym; a day without a workout on one of these does not break the streak. Sunday until chosen. */
+    val restDays: Set<DayOfWeek> = setOf(DayOfWeek.SUNDAY),
 )
 
 data class UserSession(
@@ -49,6 +52,20 @@ class UserPrefs(context: Context, uid: String) {
         }.apply()
     }
 
+    // --- Rest days ---
+
+    fun getRestDays(): Set<DayOfWeek> {
+        val saved = prefs.getStringSet(KEY_REST_DAYS, null) ?: return setOf(DayOfWeek.SUNDAY)
+        return saved.mapNotNull { name -> runCatching { DayOfWeek.valueOf(name) }.getOrNull() }.toSet()
+    }
+
+    fun saveRestDays(days: Set<DayOfWeek>) {
+        prefs.edit()
+            .putStringSet(KEY_REST_DAYS, days.map { it.name }.toSet())
+            .putLong(KEY_PROFILE_UPDATED, System.currentTimeMillis()) // so the change is uploaded
+            .apply()
+    }
+
     // --- Cloud sync of the profile ---
 
     /** True when the profile is filled in and its latest version has not been uploaded yet. */
@@ -72,6 +89,7 @@ class UserPrefs(context: Context, uid: String) {
             "highWeight" to profile.highWeight,
             "lowWeight" to profile.lowWeight,
             "lastWeightUpdate" to prefs.getLong(KEY_LAST_WEIGHT_UPDATE, 0L),
+            "restDays" to getRestDays().map { it.name },
             "updatedAt" to prefs.getLong(KEY_PROFILE_UPDATED, 0L).coerceAtLeast(1L),
         )
     }
@@ -91,6 +109,9 @@ class UserPrefs(context: Context, uid: String) {
             (remote["highWeight"] as? Number)?.let { putDouble(KEY_HIGH_WEIGHT, it.toDouble()) }
             (remote["lowWeight"] as? Number)?.let { putDouble(KEY_LOW_WEIGHT, it.toDouble()) }
             (remote["lastWeightUpdate"] as? Number)?.toLong()?.takeIf { it > 0 }?.let { putLong(KEY_LAST_WEIGHT_UPDATE, it) }
+            (remote["restDays"] as? List<*>)?.let { list ->
+                putStringSet(KEY_REST_DAYS, list.filterIsInstance<String>().toSet())
+            }
             putBoolean(KEY_PROFILE_COMPLETE, true)
             putLong(KEY_PROFILE_UPDATED, updatedAt)
             putLong(KEY_PROFILE_PUSHED, updatedAt) // it came from the cloud, so there is nothing to upload
@@ -105,6 +126,7 @@ class UserPrefs(context: Context, uid: String) {
         highWeight = prefs.getDouble(KEY_HIGH_WEIGHT),
         lowWeight = prefs.getDouble(KEY_LOW_WEIGHT),
         isComplete = prefs.getBoolean(KEY_PROFILE_COMPLETE, false),
+        restDays = getRestDays(),
     )
 
     /** When the weight was last entered, or null if it never was. */
@@ -181,6 +203,7 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_DEMO_SESSIONS = "demo_session_ids"
         private const val KEY_DEMO_FOOD = "demo_food_ids"
         private const val KEY_PROFILE_UPDATED = "profile_updated_at"
+        private const val KEY_REST_DAYS = "rest_days"
         private const val KEY_PROFILE_PUSHED = "profile_pushed_at"
         private const val KEY_DEMO_ACTIVITY = "demo_activity_ids"
         private const val KEY_DEMO_WEIGHTS = "demo_weight_dates"

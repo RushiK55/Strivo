@@ -31,6 +31,18 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         _plans.value = repository.readAllPlans()
     }
 
+    /** The id of [day]'s plan for extra exercises, created if this is the first one. */
+    suspend fun extraPlanFor(day: String): Long {
+        val id = repository.getOrCreateExtraPlan(day)
+        _plans.value = repository.readAllPlans()
+        return id
+    }
+
+    /** Drops extra-exercise plans nobody added anything to. */
+    suspend fun removeEmptyExtraPlans() {
+        if (repository.deleteEmptyExtraPlans() > 0) _plans.value = repository.readAllPlans()
+    }
+
     suspend fun deletePlan(id: Long) {
         repository.deletePlan(id)
         _plans.value = repository.readAllPlans()

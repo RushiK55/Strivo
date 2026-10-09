@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.strivo.data.model.Exercise
+import com.example.strivo.data.model.EXTRA_PLAN_NAME
 import com.example.strivo.data.model.Plan
 import com.example.strivo.ui.components.AccentButton
 import com.example.strivo.ui.components.DecimalWheelPicker
@@ -65,7 +66,9 @@ fun SaveExerciseScreen(
     var name by rememberSaveable { mutableStateOf(exercise?.name.orEmpty()) }
     var notes by rememberSaveable { mutableStateOf(exercise?.notes.orEmpty()) }
     var nameError by remember { mutableStateOf<String?>(null) }
-    var vanishEndOfDay by rememberSaveable { mutableStateOf(exercise?.vanishEndOfDay ?: false) }
+    // Exercises added straight to a day (the "Extra exercises" plan) are usually one-offs, so they vanish by default.
+    val isExtraPlan = isExtra || plan?.planName == EXTRA_PLAN_NAME
+    var vanishEndOfDay by rememberSaveable { mutableStateOf(exercise?.vanishEndOfDay ?: isExtraPlan) }
 
     var sets by rememberSaveable { mutableIntStateOf(exercise?.sets?.toIntOrNull() ?: 3) }
     var reps by rememberSaveable { mutableIntStateOf(exercise?.reps?.toIntOrNull() ?: 10) }
@@ -77,7 +80,7 @@ fun SaveExerciseScreen(
             ScreenTopBar(
                 title = when {
                     exercise != null -> "Edit Exercise"
-                    isExtra -> "Extra Workout"
+                    isExtraPlan -> "Extra Exercise"
                     else -> "New Exercise"
                 },
                 onBack = onBack,
@@ -126,7 +129,7 @@ fun SaveExerciseScreen(
                 )
             }
 
-            if (isExtra) {
+            if (isExtraPlan) {
                 Spacer(Modifier.height(30.dp))
                 SectionLabel("Options")
                 Row(
@@ -141,7 +144,7 @@ fun SaveExerciseScreen(
                     Column(Modifier.weight(1f)) {
                         Text("Vanish at end of day", fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(2.dp))
-                        Text("Keep your dashboard clean tomorrow", color = AppColors.TextSecondary, fontSize = 13.sp)
+                        Text("On: only for today. Off: repeats every week.", color = AppColors.TextSecondary, fontSize = 13.sp)
                     }
                     Switch(
                         checked = vanishEndOfDay,

@@ -58,9 +58,9 @@ class ExtraActivityTest {
 
     @Test
     fun activityOutsideTheRangeIsIgnored() {
-        val report = buildReport(emptyList(), AnalyticsRange.Week, today, listOf(activity(10, "Old run", 500)), { 80.0 })
+        val report = buildReport(emptyList(), AnalyticsRange.Week, today, listOf(activity(10, "Old run", 500)), weightKgOn = { 80.0 })
         assertEquals(0.0, report.extraCalories, 0.0)
-        val month = buildReport(emptyList(), AnalyticsRange.Month, today, listOf(activity(10, "Old run", 500)), { 80.0 })
+        val month = buildReport(emptyList(), AnalyticsRange.Month, today, listOf(activity(10, "Old run", 500)), weightKgOn = { 80.0 })
         assertEquals(500.0, month.extraCalories, 0.0)
     }
 

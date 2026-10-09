@@ -1,6 +1,7 @@
 package com.example.strivo.data.analytics
 
 import com.example.strivo.data.model.WorkoutSession
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 /** How far back the analytics look. */
@@ -52,7 +53,7 @@ data class AnalyticsReport(
     val volumeKg: Double,
     val sets: Int,
     val reps: Int,
-    /** Consecutive days with a workout, counted back from today (or yesterday if today has none yet). */
+    /** Consecutive training days counted back from today (or yesterday if today has none yet); Sundays off do not break it. */
     val streak: Int,
     val avgSessionSeconds: Long?,
     val avgSetSeconds: Long?,
@@ -84,6 +85,7 @@ fun buildReport(
     range: AnalyticsRange,
     today: LocalDate,
     extra: List<ExtraActivity> = emptyList(),
+    restDays: Set<DayOfWeek> = DefaultRestDays,
     weightKgOn: (LocalDate) -> Double? = { null },
 ): AnalyticsReport {
     val start = today.minusDays(range.days - 1L)
@@ -148,7 +150,7 @@ fun buildReport(
         volumeKg = volume,
         sets = allSets.size,
         reps = allSets.sumOf { it.reps },
-        streak = currentStreak(sessions, today),
+        streak = currentStreak(sessions, today, restDays),
         avgSessionSeconds = inRange.map { parseDurationSeconds(it.totalTime) }.filter { it > 0 }.average().takeIf { !it.isNaN() }?.toLong(),
         avgSetSeconds = setSeconds.average().takeIf { !it.isNaN() }?.toLong(),
         avgRestSeconds = restSeconds.average().takeIf { !it.isNaN() }?.toLong(),
@@ -164,14 +166,22 @@ fun buildReport(
     )
 }
 
-private fun currentStreak(sessions: List<WorkoutSession>, today: LocalDate): Int {
+fun currentStreak(sessions: List<WorkoutSession>, today: LocalDate, restDays: Set<DayOfWeek> = DefaultRestDays): Int {
     val trainedDays = sessions.map { it.date.toLocalDate() }.toSet()
     // A workout not yet done today does not break a streak that ran up to yesterday.
     var day = if (today in trainedDays) today else today.minusDays(1)
     var streak = 0
-    while (day in trainedDays) {
-        streak++
+    while (true) {
+        when {
+            day in trainedDays -> streak++
+            // A rest day without a workout is skipped: it neither breaks the streak nor adds to it.
+            day.dayOfWeek in restDays -> Unit
+            else -> break
+        }
         day = day.minusDays(1)
     }
     return streak
 }
+
+/** Gyms are mostly closed on Sundays, so a Sunday without a workout does not end a streak. */
+val DefaultRestDays: Set<DayOfWeek> = setOf(DayOfWeek.SUNDAY)

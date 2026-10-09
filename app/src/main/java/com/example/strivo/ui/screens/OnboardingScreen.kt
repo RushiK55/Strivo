@@ -45,13 +45,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.strivo.ui.components.AccentButton
 import com.example.strivo.ui.components.DecimalWheelPicker
+import com.example.strivo.ui.components.RestDayPicker
 import com.example.strivo.ui.components.WheelPicker
 import com.example.strivo.ui.theme.AppColors
 import com.example.strivo.viewmodel.AuthViewModel
 import com.example.strivo.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 
-private const val StepCount = 4
+private const val StepCount = 5
 
 @Composable
 fun OnboardingScreen(authViewModel: AuthViewModel, profileViewModel: ProfileViewModel) {
@@ -62,6 +64,9 @@ fun OnboardingScreen(authViewModel: AuthViewModel, profileViewModel: ProfileView
     var age by rememberSaveable { mutableIntStateOf(25) }
     var height by rememberSaveable { mutableDoubleStateOf(170.0) }
     var weight by rememberSaveable { mutableDoubleStateOf(70.0) }
+    // Kept as text so it survives a rotation; Sunday is the usual day off.
+    var restDaysText by rememberSaveable { mutableStateOf(DayOfWeek.SUNDAY.name) }
+    val restDays = restDaysText.split(",").mapNotNull { name -> runCatching { DayOfWeek.valueOf(name) }.getOrNull() }.toSet()
 
     val currentIndex = pagerState.currentPage
 
@@ -71,6 +76,7 @@ fun OnboardingScreen(authViewModel: AuthViewModel, profileViewModel: ProfileView
 
     fun saveAndFinish() {
         scope.launch {
+            profileViewModel.saveRestDays(restDays)
             profileViewModel.saveProfile(gender = gender, age = age, height = height, weight = weight)
             authViewModel.refreshProfileStatus()
         }
@@ -119,7 +125,7 @@ fun OnboardingScreen(authViewModel: AuthViewModel, profileViewModel: ProfileView
                     )
                 }
 
-                else -> StepContainer("What's your weight?", "Measure in kilograms") {
+                3 -> StepContainer("What's your weight?", "Measure in kilograms") {
                     DecimalWheelPicker(
                         label = "KG",
                         minValue = 30,
@@ -127,6 +133,16 @@ fun OnboardingScreen(authViewModel: AuthViewModel, profileViewModel: ProfileView
                         value = weight,
                         onValueChange = { weight = it },
                         dotSize = 40.sp,
+                    )
+                }
+
+                else -> StepContainer(
+                    "Which days do you rest?",
+                    "A rest day without a workout won't break your streak. Pick any days, or none.",
+                ) {
+                    RestDayPicker(
+                        selected = restDays,
+                        onChange = { days -> restDaysText = days.joinToString(",") { it.name } },
                     )
                 }
             }

@@ -60,6 +60,8 @@ data class WorkoutState(
     val isLoading: Boolean = true,
     val exercises: List<Exercise> = emptyList(),
     val isWorkoutRunning: Boolean = false,
+    /** The main button paused the workout: every clock (workout, set and rest) is frozen until it is resumed. */
+    val isPaused: Boolean = false,
     val showRestTimer: Boolean = false,
     val isExerciseRest: Boolean = false,
     val activeSetExerciseIndex: Int? = null,
@@ -77,6 +79,9 @@ sealed interface WorkoutEvent {
     data class Message(val text: String, val kind: MessageKind) : WorkoutEvent
     data class ShowSummary(val exerciseIndex: Int) : WorkoutEvent
     data object ShowComplete : WorkoutEvent
+
+    /** Resuming after a pause: bring the full-screen set view back so the workout carries on from there. */
+    data object FocusOnNextSet : WorkoutEvent
 }
 
 class WorkoutViewModel(
@@ -98,9 +103,9 @@ class WorkoutViewModel(
     // The three clocks are separate flows so only the texts that show them recompose on every tick.
     private val _workoutTime = MutableStateFlow("00:00:00")
     val workoutTime: StateFlow<String> = _workoutTime
-    private val _restTime = MutableStateFlow("00:00:00")
+    private val _restTime = MutableStateFlow("00:00")
     val restTime: StateFlow<String> = _restTime
-    private val _setTime = MutableStateFlow("00:00:00")
+    private val _setTime = MutableStateFlow("00:00")
     val setTime: StateFlow<String> = _setTime
 
     private val eventChannel = Channel<WorkoutEvent>(Channel.BUFFERED)
@@ -112,8 +117,8 @@ class WorkoutViewModel(
             while (isActive) {
                 delay(100)
                 if (workoutWatch.isRunning) _workoutTime.value = formatDuration(workoutWatch.elapsedMillis)
-                if (restWatch.isRunning) _restTime.value = formatDuration(restWatch.elapsedMillis)
-                if (setWatch.isRunning) _setTime.value = formatDuration(setWatch.elapsedMillis)
+                if (restWatch.isRunning) _restTime.value = com.example.strivo.util.formatDurationMinSec(restWatch.elapsedMillis)
+                if (setWatch.isRunning) _setTime.value = com.example.strivo.util.formatDurationMinSec(setWatch.elapsedMillis)
             }
         }
     }
@@ -148,16 +153,31 @@ class WorkoutViewModel(
         }
     }
 
+    /** Freezes every clock: the workout's, the running set's and the rest between sets or exercises. */
     private fun pauseWorkout() {
         workoutWatch.stop()
-        if (_state.value.activeSetIndex != null) setWatch.stop()
+        setWatch.stop()
+        restWatch.stop()
         syncWorkoutRunning()
     }
 
+    /**
+     * Unfreezes what was running and carries on: the set that was in progress continues, a rest that was running
+     * continues (with the full-screen view back on the set that comes next); with neither, the next set starts.
+     */
     private fun resumeWorkout() {
+        val current = _state.value
         workoutWatch.start()
-        if (_state.value.activeSetIndex != null) setWatch.start()
+        when {
+            current.activeSetIndex != null -> setWatch.start()
+            current.showRestTimer -> restWatch.start()
+        }
         syncWorkoutRunning()
+        if (current.activeSetIndex != null || current.showRestTimer) {
+            eventChannel.trySend(WorkoutEvent.FocusOnNextSet)
+        } else {
+            startFirstSet()
+        }
     }
 
     private fun startFirstSet() {
@@ -176,13 +196,23 @@ class WorkoutViewModel(
     }
 
     fun resetWorkout() {
+        // Resetting a paused workout also drops what was frozen, so START begins cleanly.
+        if (!workoutWatch.isRunning) {
+            abandonActiveSet()
+            stopRest()
+        }
         workoutWatch.reset()
         _workoutTime.value = "00:00:00"
         syncWorkoutRunning()
     }
 
     private fun syncWorkoutRunning() {
-        _state.update { it.copy(isWorkoutRunning = workoutWatch.isRunning) }
+        _state.update {
+            it.copy(
+                isWorkoutRunning = workoutWatch.isRunning,
+                isPaused = !workoutWatch.isRunning && workoutWatch.elapsedMillis > 0L,
+            )
+        }
     }
 
     // --- Expansion ---
@@ -229,6 +259,11 @@ class WorkoutViewModel(
 
     /** The play / pause / check button on a set row. */
     fun onSetButton(exerciseIndex: Int, setIndex: Int) {
+        // While paused nothing may start or finish; the tap just resumes the workout.
+        if (_state.value.isPaused) {
+            resumeWorkout()
+            return
+        }
         val current = _state.value
         val exercise = current.exercises.getOrNull(exerciseIndex) ?: return
         val set = exercise.setsList.getOrNull(setIndex) ?: return
@@ -271,7 +306,7 @@ class WorkoutViewModel(
     }
 
     private fun completeSet(exerciseIndex: Int, exercise: Exercise, setIndex: Int, set: ExerciseSet, isLastSet: Boolean) {
-        val duration = formatDuration(setWatch.elapsedMillis)
+        val duration = com.example.strivo.util.formatDurationMinSec(setWatch.elapsedMillis)
         setWatch.stop()
         val weightText = if (set.weight == 0.0) "bodyweight" else "${formatWeight(set.weight)} kg"
         _state.update {
@@ -421,7 +456,7 @@ class WorkoutViewModel(
         val setIndex = current.activeRestSetIndex
         if (exerciseIndex != null && setIndex != null) {
             current.exercises.getOrNull(exerciseIndex)?.let { exercise ->
-                val rest = formatDuration(restWatch.elapsedMillis)
+                val rest = com.example.strivo.util.formatDurationMinSec(restWatch.elapsedMillis)
                 val updated = when {
                     current.isExerciseRest -> exercise.copy(restTime = rest)
                     setIndex < exercise.setsList.size ->

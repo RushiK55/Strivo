@@ -58,6 +58,13 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         reloadDay(selectedDay())
     }
 
+    /** Every exercise the user has, one per name (its newest version), A to Z: the list to pick an extra exercise from. */
+    suspend fun knownExercises(): List<Exercise> =
+        repository.readAllExercises()
+            .sortedByDescending { it.id ?: 0L }
+            .distinctBy { it.name.trim().lowercase() }
+            .sortedBy { it.name.lowercase() }
+
     /** Adds several exercises (in order) to the end of their plan, refreshing the lists once. */
     suspend fun addExercises(exercises: List<Exercise>) {
         if (exercises.isEmpty()) return

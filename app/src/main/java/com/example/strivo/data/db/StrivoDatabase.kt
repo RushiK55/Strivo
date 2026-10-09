@@ -394,6 +394,14 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
         readableDatabase.query("plans", null, "planId = ?", arrayOf(id.toString()), null, null, null)
             .use { c -> if (c.moveToFirst()) c.toPlan() else null }
 
+    /** Removes extra-exercise plans that ended up with no exercises (the user opened the add screen and backed out). */
+    fun deleteEmptyExtraPlans(name: String): Int =
+        writableDatabase.delete(
+            "plans",
+            "planName = ? AND planId NOT IN (SELECT DISTINCT planId FROM exercises)",
+            arrayOf(name),
+        )
+
     fun updatePlan(plan: Plan): Int =
         writableDatabase.update("plans", plan.toValues(), "planId = ?", arrayOf(plan.planId.toString()))
 

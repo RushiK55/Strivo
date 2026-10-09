@@ -33,6 +33,8 @@ import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FitnessCenter
@@ -53,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -64,6 +67,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.strivo.StrivoApp
+import com.example.strivo.data.analytics.currentStreak
+import com.example.strivo.data.model.EXTRA_PLAN_NAME
+import com.example.strivo.data.model.Exercise
 import com.example.strivo.data.model.Plan
 import com.example.strivo.ui.components.AccentButton
 import com.example.strivo.ui.components.AccentTitle
@@ -82,6 +88,7 @@ import com.example.strivo.viewmodel.ProfileViewModel
 import com.example.strivo.viewmodel.groupedByDay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val DayItemWidth = 87.dp // 75 (card) + 12 (margins)
 private val DayListPadding = 16.dp
@@ -94,6 +101,8 @@ fun HomeScreen(
     profileViewModel: ProfileViewModel,
     onAddPlan: (day: String) -> Unit,
     onOpenPlan: (Plan) -> Unit,
+    onStartWorkout: (Plan) -> Unit,
+    onAddExercise: (planId: Long) -> Unit,
 ) {
     val today = remember { LocalDate.now() }
     val currentWeek = remember { weekOf(today) }
@@ -106,8 +115,10 @@ fun HomeScreen(
 
     // A plan counts as completed when its workout was finished that day, or (today) every exercise in it is ticked off.
     val sessions by exerciseViewModel.history.collectAsStateWithLifecycle()
+    val profileState by profileViewModel.state.collectAsStateWithLifecycle()
     val dayExercises by exerciseViewModel.todayExercises.collectAsStateWithLifecycle()
     val selectedDate = remember(selectedDay) { currentWeek.first { dayName(it.dayOfWeek) == selectedDay } }
+    fun exerciseCount(plan: Plan): Int = dayExercises.count { it.planId == plan.planId }
     fun isCompleted(plan: Plan): Boolean {
         if (sessions.any { it.planName == plan.planName && it.date.toLocalDate() == selectedDate }) return true
         val exercises = dayExercises.filter { it.planId == plan.planId }
@@ -116,9 +127,13 @@ fun HomeScreen(
 
     var showWeightDialog by remember { mutableStateOf(false) }
     var planToDelete by remember { mutableStateOf<Plan?>(null) }
+    var showExtraSheet by remember { mutableStateOf(false) }
+    var knownExercises by remember { mutableStateOf<List<Exercise>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
+        profileViewModel.load() // the rest days the streak skips
+        planViewModel.removeEmptyExtraPlans()
         planViewModel.refreshPlans()
         exerciseViewModel.fetchHistory()
         exerciseViewModel.loadExercisesByDay(selectedDay)
@@ -141,44 +156,64 @@ fun HomeScreen(
             .background(AppColors.Background)
             .systemBarsPadding(),
     ) {
-        // Top navigation & branding
+        // Greeting, and a snapshot of how the week is going
         item {
+            val weekStart = currentWeek.first()
+            val weekEnd = currentWeek.last()
+            val todaysPlans = groupedPlans[dayName(today.dayOfWeek)].orEmpty()
+            val doneToday = todaysPlans.count { plan ->
+                sessions.any { it.planName == plan.planName && it.date.toLocalDate() == today }
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                IconBadge(
-                    icon = Icons.Filled.FitnessCenter,
-                    background = AppColors.Accent.copy(alpha = 0.2f),
-                    padding = 8.dp,
-                    iconSize = 24.dp,
-                    shape = RoundedCornerShape(12.dp),
-                )
-                Spacer(Modifier.height(30.dp))
-                Text(
-                    text = "Strivo",
-                    color = AppColors.TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp,
-                )
-                Text(
-                    text = dayName(today.dayOfWeek),
-                    color = AppColors.TextSecondary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(40.dp))
-                Text(
-                    text = "Hello, ${auth.userName?.split(' ')?.first() ?: "User"}",
-                    color = AppColors.TextPrimary,
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = "Hello, ${auth.userName?.split(' ')?.first() ?: "User"}",
+                            color = AppColors.TextPrimary,
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.Black,
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),
+                            color = AppColors.TextSecondary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    IconBadge(
+                        icon = Icons.Filled.FitnessCenter,
+                        background = AppColors.Accent.copy(alpha = 0.2f),
+                        padding = 10.dp,
+                        iconSize = 26.dp,
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeaderStat(
+                        icon = Icons.Rounded.LocalFireDepartment,
+                        value = currentStreak(sessions, today, profileState.profile.restDays).toString(),
+                        label = "Day streak",
+                        modifier = Modifier.weight(1f),
+                    )
+                    HeaderStat(
+                        icon = Icons.Filled.FitnessCenter,
+                        value = sessions.count { it.date.toLocalDate() in weekStart..weekEnd }.toString(),
+                        label = "This week",
+                        modifier = Modifier.weight(1f),
+                    )
+                    HeaderStat(
+                        icon = Icons.Rounded.Check,
+                        value = if (todaysPlans.isEmpty()) "Rest" else "$doneToday / ${todaysPlans.size}",
+                        label = "Today",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
 
@@ -272,7 +307,47 @@ fun HomeScreen(
             }
         } else {
             items(plansForDay, key = { it.planId ?: it.hashCode().toLong() }) { plan ->
-                PlanCard(plan = plan, completed = isCompleted(plan), onClick = { onOpenPlan(plan) }, onDelete = { planToDelete = plan })
+                PlanCard(
+                    plan = plan,
+                    completed = isCompleted(plan),
+                    canStart = !isCompleted(plan) && exerciseCount(plan) > 0,
+                    onClick = { onOpenPlan(plan) },
+                    onStart = { onStartWorkout(plan) },
+                    onDelete = { planToDelete = plan },
+                )
+            }
+        }
+
+        // Exercises done on top of (or instead of) the plans: added straight to the day, no plan needed.
+        item {
+            val shape = RoundedCornerShape(20.dp)
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .border(BorderStroke(1.dp, AppColors.Accent.copy(alpha = 0.35f)), shape)
+                    .clickable {
+                        scope.launch {
+                            knownExercises = exerciseViewModel.knownExercises()
+                            showExtraSheet = true
+                        }
+                    }
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBadge(
+                    icon = Icons.Rounded.Add,
+                    tint = Color.Black,
+                    background = AppColors.Accent,
+                    padding = 8.dp,
+                    iconSize = 20.dp,
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Add extra exercise", color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("Did something that's not in a plan? Add it to $selectedDay.", color = AppColors.TextSecondary, fontSize = 12.sp)
+                }
             }
         }
 
@@ -300,6 +375,29 @@ fun HomeScreen(
                 color = AppColors.TextSecondary,
             )
         }
+    }
+
+    if (showExtraSheet) {
+        // What this day's extra plan already holds, so those rows show as added.
+        val extraPlanId = plansForDay.firstOrNull { it.planName == EXTRA_PLAN_NAME }?.planId
+        val addedNames = dayExercises.filter { it.planId == extraPlanId }.map { it.name.trim().lowercase() }.toSet()
+        ExtraExerciseSheet(
+            day = selectedDay,
+            exercises = knownExercises,
+            addedNames = addedNames,
+            onAdd = { exercise ->
+                scope.launch {
+                    val planId = planViewModel.extraPlanFor(selectedDay)
+                    // Extras are one-offs by default; a copy keeps the sets, reps, weight and notes.
+                    exerciseViewModel.copyExerciseToPlan(exercise.copy(vanishEndOfDay = true), planId)
+                }
+            },
+            onNew = {
+                showExtraSheet = false
+                scope.launch { onAddExercise(planViewModel.extraPlanFor(selectedDay)) }
+            },
+            onDismiss = { showExtraSheet = false },
+        )
     }
 
     if (showWeightDialog) {
@@ -391,7 +489,14 @@ private fun DayCard(date: LocalDate, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PlanCard(plan: Plan, completed: Boolean, onClick: () -> Unit, onDelete: () -> Unit) {
+private fun PlanCard(
+    plan: Plan,
+    completed: Boolean,
+    canStart: Boolean,
+    onClick: () -> Unit,
+    onStart: () -> Unit,
+    onDelete: () -> Unit,
+) {
     val shape = RoundedCornerShape(20.dp)
     Row(
         modifier = Modifier
@@ -430,7 +535,19 @@ private fun PlanCard(plan: Plan, completed: Boolean, onClick: () -> Unit, onDele
         IconButton(onClick = onDelete) {
             Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete plan", tint = AppColors.Danger)
         }
-        ChevronBadge()
+        if (canStart) {
+            // One tap to begin: no need to open the plan first.
+            IconBadge(
+                icon = Icons.Rounded.PlayArrow,
+                tint = Color.Black,
+                background = AppColors.Accent,
+                padding = 8.dp,
+                iconSize = 22.dp,
+                modifier = Modifier.clickable(onClick = onStart),
+            )
+        } else {
+            ChevronBadge()
+        }
         Spacer(Modifier.width(12.dp))
     }
 }
@@ -470,5 +587,21 @@ private fun WeightUpdateDialog(onUpdate: (Double) -> Unit) {
                 Text("UPDATE", fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+/** One number from the week with a small icon and a label, in the same card style as the rest of the app. */
+@Composable
+private fun HeaderStat(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(AppColors.Surface)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(value, color = AppColors.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.Black, maxLines = 1)
+        Text(label, color = AppColors.TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
     }
 }

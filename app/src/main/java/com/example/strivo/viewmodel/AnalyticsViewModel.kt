@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 data class AnalyticsState(
@@ -41,6 +42,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
     private var food: List<FoodEntry> = emptyList()
     private var activities: List<ExtraActivity> = emptyList()
     private var profile = BodyProfile(null, null, null, null)
+    private var restDays: Set<DayOfWeek> = setOf(DayOfWeek.SUNDAY)
 
     private val _state = MutableStateFlow(AnalyticsState())
     val state: StateFlow<AnalyticsState> = _state
@@ -54,6 +56,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             activities = repository.readActivities()
             profile = withContext(Dispatchers.IO) {
                 val saved = app.userPrefs.getProfile()
+                restDays = saved.restDays
                 BodyProfile(saved.gender, saved.age, saved.height, saved.weight)
             }
             recompute(_state.value.range)
@@ -88,7 +91,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             val weightOn = { date: LocalDate -> weightAt(weightLog, date) ?: profile.weightKg }
             val body = buildBodyReport(profile, weightLog, sessions, today)
             Triple(
-                buildReport(sessions, range, today, activities, weightOn),
+                buildReport(sessions, range, today, activities, restDays, weightOn),
                 body,
                 buildNutrition(food, range, today, body.maintenanceKcal),
             )

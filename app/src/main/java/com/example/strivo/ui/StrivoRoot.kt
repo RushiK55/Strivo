@@ -233,6 +233,8 @@ private fun StrivoNavGraph(
                 profileViewModel = profileViewModel,
                 onAddPlan = { day -> navController.navigate(Routes.pickPlan(day)) },
                 onOpenPlan = { plan -> plan.planId?.let { navController.navigate(Routes.planDetails(it)) } },
+                onStartWorkout = { plan -> plan.planId?.let { navController.navigate(Routes.workout(it)) } },
+                onAddExercise = { planId -> navController.navigate(Routes.saveExercise(planId)) },
             )
         }
 

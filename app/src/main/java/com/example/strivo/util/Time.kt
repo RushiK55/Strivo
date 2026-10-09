@@ -32,5 +32,13 @@ fun formatDuration(millis: Long): String {
     return "%02d:%02d:%02d".format(hours, minutes, seconds)
 }
 
+/** MM:SS */
+fun formatDurationMinSec(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val minutes = (totalSeconds / 60)
+    val seconds = totalSeconds % 60
+    return "%02d:%02d".format(minutes, seconds)
+}
+
 /** Whole-number-aware formatting of a decimal with one fraction digit (like Dart's toStringAsFixed(1)). */
 fun Double.fixed1(): String = "%.1f".format(Locale.US, this)

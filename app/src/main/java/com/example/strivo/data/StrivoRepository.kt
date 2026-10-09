@@ -6,6 +6,7 @@ import com.example.strivo.data.analytics.WeightEntry
 import com.example.strivo.data.db.PersonalRecords
 import com.example.strivo.data.db.StrivoDatabase
 import com.example.strivo.data.model.Exercise
+import com.example.strivo.data.model.EXTRA_PLAN_NAME
 import com.example.strivo.data.model.Plan
 import com.example.strivo.data.model.WorkoutSession
 import com.example.strivo.data.prefs.UserPrefs
@@ -30,6 +31,14 @@ class StrivoRepository(
     suspend fun createPlan(plan: Plan): Long = io { db.createPlan(plan) }
 
     suspend fun deletePlan(id: Long) = io { db.deletePlan(id) }
+
+    /** The plan holding [day]'s extra exercises; created the first time one is added. */
+    suspend fun getOrCreateExtraPlan(day: String): Long = io {
+        db.readAllPlans().firstOrNull { it.planDay == day && it.planName == EXTRA_PLAN_NAME }?.planId
+            ?: db.createPlan(Plan(planName = EXTRA_PLAN_NAME, planDay = day))
+    }
+
+    suspend fun deleteEmptyExtraPlans(): Int = io { db.deleteEmptyExtraPlans(EXTRA_PLAN_NAME) }
 
     /** Copies [source] and its exercises (fresh, nothing ticked off) onto [day]; returns the new plan's id. */
     suspend fun copyPlanToDay(source: Plan, day: String): Long = io {

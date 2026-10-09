@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 data class ProfileState(
@@ -49,6 +50,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         withContext(Dispatchers.IO) { prefs.saveProfile(gender, age, height, weight) }
         // Editing gender, age or height hands the old weight back in; only a changed weight is a new weigh-in.
         if (previousWeight == null || previousWeight != weight) repository.logWeight(weight)
+    }
+
+    suspend fun saveRestDays(days: Set<DayOfWeek>) {
+        withContext(Dispatchers.IO) { prefs.saveRestDays(days) }
     }
 
     suspend fun updateWeightOnly(weight: Double) {
