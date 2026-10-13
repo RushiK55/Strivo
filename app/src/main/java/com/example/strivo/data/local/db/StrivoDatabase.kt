@@ -6,9 +6,11 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.example.strivo.core.util.nowIso
+import com.example.strivo.domain.activity.ActivityEvent
 import com.example.strivo.domain.analytics.ExtraActivity
 import com.example.strivo.domain.analytics.FoodEntry
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.countsForRecords
@@ -450,6 +452,39 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
                 }
             }
         }
+
+    // --- Activity events ---
+
+    fun insertEvent(event: ActivityEvent): Long = writableDatabase.insert("activity_events", null, event.toValues())
+
+    /** The newest events first. */
+    fun readEvents(limit: Int): List<ActivityEvent> =
+        readableDatabase.query("activity_events", null, null, null, null, null, "at DESC, id DESC", limit.toString()).use { c ->
+            buildList { while (c.moveToNext()) add(c.toActivityEvent()) }
+        }
+
+    // --- Exercise library ---
+
+    fun readLibrary(): List<LibraryExercise> =
+        readableDatabase.query("library_exercises", null, null, null, null, null, "muscleGroup, name COLLATE NOCASE").use { c ->
+            buildList { while (c.moveToNext()) add(c.toLibraryExercise()) }
+        }
+
+    fun libraryCount(): Int =
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM library_exercises", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+
+    /** Makes the library exactly [exercises]: the ones given are written and any other is removed, all or nothing. */
+    fun replaceLibrary(exercises: List<LibraryExercise>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("library_exercises", null, null)
+            exercises.forEach { db.insert("library_exercises", null, it.toValues()) }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
 
     companion object {
         /** The database file for [uid]: every account keeps its own. */

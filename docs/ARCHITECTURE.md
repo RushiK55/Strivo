@@ -99,6 +99,24 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
 - Sets are stored as JSON inside their exercise or workout session. New fields (like a set's `type`) are optional in the
   JSON, so older data keeps loading.
 
+## Activity log, library and the admin dashboard
+
+- **Activity log.** `domain/activity/ActivityLog.kt` turns each user action into one plain line ("Added "Bench Press" to Push
+  Day (Monday) · 4 × 8 @ 60 kg"). `StrivoRepository` records them as it saves (plans, exercises, finished workouts, food,
+  weigh-ins, profile). They are stored in `activity_events`, which is a synced table, so they reach `users/{uid}/events`.
+  Demo data and things restored from the cloud are not recorded.
+- **User summary.** `SyncManager.publishUserSummary` keeps `users/{uid}` (name, email, last active, app version, last
+  action) up to date, at most every five minutes, so the dashboard can list users without reading their data.
+- **Library.** `library/{exerciseId}` in the cloud is pulled into the local `library_exercises` table (pull-only, never
+  written by the app). A new install starts from `assets/library.json`, the same file as `admin/seed/library.json`
+  (Gradle adds that folder to the app's assets), so the library works offline from the first launch.
+- **Admin dashboard.** `admin/` is a Next.js app (React, TypeScript) exported as a static site for Firebase Hosting; its logic is in
+  `admin/src/lib` and tested with Vitest. It reads what users have saved and writes only
+  the library and the admin list. `firestore.rules` is what keeps it that way: an admin is a document in `admins/`, may
+  read all of `users/`, and may not write there.
+- **Emulator tests.** `tools/emulator-tests` runs the rules and the dashboard (in headless Chrome) against the Firebase
+  emulators: `cd tools/emulator-tests && npm test`.
+
 ## Debug-only tools
 
 Debug builds show demo-data rows in **Profile → Data**: four weeks of workouts, plans, meals and weigh-ins, and two

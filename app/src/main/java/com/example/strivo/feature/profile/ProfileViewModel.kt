@@ -51,10 +51,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         withContext(Dispatchers.IO) { prefs.saveProfile(gender, age, height, weight) }
         // Editing gender, age or height hands the old weight back in; only a changed weight is a new weigh-in.
         if (previousWeight == null || previousWeight != weight) repository.logWeight(weight)
+        repository.recordProfileUpdated()
     }
 
     suspend fun saveRestDays(days: Set<DayOfWeek>) {
         withContext(Dispatchers.IO) { prefs.saveRestDays(days) }
+        repository.recordProfileUpdated()
     }
 
     suspend fun updateWeightOnly(weight: Double) {

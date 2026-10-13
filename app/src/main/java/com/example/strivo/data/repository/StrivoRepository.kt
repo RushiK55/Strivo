@@ -6,6 +6,18 @@ import com.example.strivo.data.demo.DemoWeightTrend
 import com.example.strivo.data.local.db.PersonalRecords
 import com.example.strivo.data.local.db.StrivoDatabase
 import com.example.strivo.data.local.prefs.UserPrefs
+import com.example.strivo.domain.activity.ActivityEvent
+import com.example.strivo.domain.activity.activityAdded
+import com.example.strivo.domain.activity.exerciseAdded
+import com.example.strivo.domain.activity.exerciseEdited
+import com.example.strivo.domain.activity.exerciseRemoved
+import com.example.strivo.domain.activity.foodLogged
+import com.example.strivo.domain.activity.planCopied
+import com.example.strivo.domain.activity.planCreated
+import com.example.strivo.domain.activity.planDeleted
+import com.example.strivo.domain.activity.profileUpdated
+import com.example.strivo.domain.activity.weightLogged
+import com.example.strivo.domain.activity.workoutFinished
 import com.example.strivo.domain.analytics.ExtraActivity
 import com.example.strivo.domain.analytics.FoodEntry
 import com.example.strivo.domain.analytics.WeightEntry
@@ -13,6 +25,7 @@ import com.example.strivo.domain.coach.PlannedExercise
 import com.example.strivo.domain.coach.exerciseKey
 import com.example.strivo.domain.model.EXTRA_PLAN_NAME
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
@@ -29,13 +42,31 @@ class StrivoRepository(
 ) {
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
 
+    private fun now(): Long = System.currentTimeMillis()
+
+    /** Writes a line to the activity log, which is backed up with the rest of the user's data. */
+    private fun record(event: ActivityEvent) {
+        db.insertEvent(event)
+    }
+
+    /** The newest lines of the activity log, newest first. */
+    suspend fun readEvents(limit: Int = 100): List<ActivityEvent> = io { db.readEvents(limit) }
+
+    suspend fun recordProfileUpdated() = io { record(profileUpdated(now())) }
+
     // --- Plans ---
 
     suspend fun readAllPlans(): List<Plan> = io { db.readAllPlans() }
 
-    suspend fun createPlan(plan: Plan): Long = io { db.createPlan(plan) }
+    suspend fun createPlan(plan: Plan): Long = io {
+        db.createPlan(plan).also { record(planCreated(plan, now())) }
+    }
 
-    suspend fun deletePlan(id: Long) = io { db.deletePlan(id) }
+    suspend fun deletePlan(id: Long) = io {
+        val plan = db.getPlan(id)
+        db.deletePlan(id)
+        plan?.let { record(planDeleted(it, now())) }
+    }
 
     /** The plan holding [day]'s extra exercises; created the first time one is added. */
     suspend fun getOrCreateExtraPlan(day: String): Long = io {
@@ -60,6 +91,7 @@ class StrivoRepository(
                 )
             )
         }
+        record(planCopied(source, day, now()))
         newId
     }
 
@@ -73,26 +105,34 @@ class StrivoRepository(
 
     suspend fun readAllExercises(): List<Exercise> = io { db.readAllExercises() }
 
-    suspend fun createExercise(exercise: Exercise): Long = io { db.createExercise(exercise) }
+    suspend fun createExercise(exercise: Exercise, fromLibrary: Boolean = false): Long = io {
+        db.createExercise(exercise).also { record(exerciseAdded(exercise, db.getPlan(exercise.planId), now(), fromLibrary)) }
+    }
 
-    suspend fun deleteExercise(id: Long) = io { db.deleteExercise(id) }
+    suspend fun deleteExercise(id: Long) = io {
+        val exercise = db.getExercise(id)
+        db.deleteExercise(id)
+        exercise?.let { record(exerciseRemoved(it, db.getPlan(it.planId), now())) }
+    }
 
     suspend fun moveExerciseToPlan(id: Long, targetPlanId: Long) = io { db.moveExerciseToPlan(id, targetPlanId) }
 
     /** Adds a fresh copy of [exercise] (planned sets / reps / weight, nothing logged) to the end of another plan. */
     suspend fun copyExerciseToPlan(exercise: Exercise, targetPlanId: Long): Long = io {
-        db.createExercise(
-            exercise.copy(
-                id = null,
-                planId = targetPlanId,
-                isCheck = false,
-                dateTime = "",
-                restTime = "",
-                sortOrder = -1,
-                setsList = emptyList(),
-            )
+        val copy = exercise.copy(
+            id = null,
+            planId = targetPlanId,
+            isCheck = false,
+            dateTime = "",
+            restTime = "",
+            sortOrder = -1,
+            setsList = emptyList(),
         )
+        db.createExercise(copy).also { record(exerciseAdded(copy, db.getPlan(targetPlanId), now())) }
     }
+
+    /** Adds a library exercise to a plan with its suggested sets, reps and weight. */
+    suspend fun addLibraryExercise(exercise: LibraryExercise, planId: Long): Long = createExercise(exercise.toPlanExercise(planId), fromLibrary = true)
 
     /**
      * Makes [kg] the planned weight of every exercise called [name], in every plan: each weekday's plan and the library
@@ -122,6 +162,12 @@ class StrivoRepository(
 
     suspend fun reorderExercises(planId: Long, orderedIds: List<Long>) = io { db.setExerciseOrder(planId, orderedIds) }
 
+    /** Saves an exercise the user edited in a plan (not a set logged in a workout) and notes the change. */
+    suspend fun editExercise(exercise: Exercise) {
+        updateExercise(exercise)
+        io { record(exerciseEdited(exercise, db.getPlan(exercise.planId), now())) }
+    }
+
     /** Saves the exercise and keeps the history table in sync with its checked state. */
     suspend fun updateExercise(exercise: Exercise) = io {
         db.updateExercise(exercise)
@@ -140,7 +186,10 @@ class StrivoRepository(
 
     // --- Weight log ---
 
-    suspend fun logWeight(kg: Double, date: LocalDate = LocalDate.now()) = io { db.upsertWeight(date.toString(), kg) }
+    suspend fun logWeight(kg: Double, date: LocalDate = LocalDate.now()) = io {
+        db.upsertWeight(date.toString(), kg)
+        record(weightLogged(kg, now()))
+    }
 
     /**
      * All dated weigh-ins. If none were recorded yet (weights entered before the log existed), the current weight
@@ -218,7 +267,9 @@ class StrivoRepository(
 
     suspend fun readFood(): List<FoodEntry> = io { db.readFood() }
 
-    suspend fun addFood(entry: FoodEntry): Long = io { db.insertFood(entry) }
+    suspend fun addFood(entry: FoodEntry): Long = io {
+        db.insertFood(entry).also { record(foodLogged(entry, now())) }
+    }
 
     suspend fun updateFood(entry: FoodEntry) = io { db.updateFood(entry) }
 
@@ -228,12 +279,18 @@ class StrivoRepository(
 
     suspend fun readActivities(): List<ExtraActivity> = io { db.readActivities() }
 
-    suspend fun addActivity(entry: ExtraActivity): Long = io { db.insertActivity(entry) }
+    suspend fun addActivity(entry: ExtraActivity): Long = io {
+        db.insertActivity(entry).also { record(activityAdded(entry, now())) }
+    }
 
     suspend fun deleteActivity(id: Long) = io { db.deleteActivity(id) }
 
-    suspend fun saveSession(session: WorkoutSession, replaceId: Long? = null): Long =
-        io { db.saveSession(session, replaceId) }
+    suspend fun saveSession(session: WorkoutSession, replaceId: Long? = null): Long = io {
+        db.saveSession(session, replaceId).also {
+            // Finishing the same workout again updates it; only a new one is something the user did.
+            if (replaceId == null) record(workoutFinished(session, now()))
+        }
+    }
 
     suspend fun getWorkoutSessions(): List<WorkoutSession> = io { db.getWorkoutSessions() }
 
@@ -241,4 +298,14 @@ class StrivoRepository(
     suspend fun markPlanFinished(planId: Long, exerciseIds: Set<Long>, today: LocalDate) = io { prefs.setFinishedPlan(today, planId, exerciseIds) }
 
     suspend fun finishedPlans(today: LocalDate): Map<Long, Set<Long>> = io { prefs.getFinishedPlans(today) }
+
+    // --- Exercise library ---
+
+    /** The exercises users can browse: the ones an admin has not hidden. */
+    suspend fun readLibrary(): List<LibraryExercise> = io { db.readLibrary().filter { it.active } }
+
+    /** Puts the starter library in place on a phone that has none yet; the cloud's library replaces it when it arrives. */
+    suspend fun seedLibraryIfEmpty(starter: List<LibraryExercise>) = io {
+        if (db.libraryCount() == 0 && starter.isNotEmpty()) db.replaceLibrary(starter)
+    }
 }

@@ -6,12 +6,15 @@ import android.net.NetworkCapabilities
 import com.example.strivo.data.local.db.StrivoDatabase
 import com.example.strivo.data.local.db.SyncTables
 import com.example.strivo.data.local.prefs.UserPrefs
+import com.example.strivo.domain.model.LibraryExercise
 import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -64,6 +67,7 @@ class SyncManager(
     private var job: Job? = null
     private var failures = 0
     private var retryNotBefore = 0L
+    private var lastUserSummaryAt = 0L
 
     private val firestore: FirebaseFirestore
         get() = firestoreInstance()
@@ -113,6 +117,7 @@ class SyncManager(
         _status.update { it.copy(isSyncing = true) }
         try {
             push()
+            publishUserSummary()
             if (pull) pullAll()
             failures = 0
             retryNotBefore = 0L
@@ -184,7 +189,52 @@ class SyncManager(
             }
         }
         if (pullProfile()) applied = true
+        if (pullLibrary()) applied = true
         if (applied) onCloudDataApplied()
+    }
+
+    /**
+     * The exercise library an admin publishes. When the cloud has one it becomes the phone's library (so removed
+     * exercises disappear too); when it has none, the starter library that shipped with the app stays. This is best
+     * effort: a library that cannot be read (rules not published yet, no admin has added one) never fails the backup.
+     */
+    private suspend fun pullLibrary(): Boolean = try {
+        val snapshot = withTimeout(READ_TIMEOUT_MILLIS) { firestore.collection("library").get(Source.SERVER).await() }
+        val exercises = snapshot.documents.mapNotNull { LibraryExercise.fromMap(it.id, it.data ?: emptyMap()) }
+        if (exercises.isEmpty()) false else { db.replaceLibrary(exercises); true }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * Keeps a small summary of this user at users/{uid} for the admin dashboard: who they are, when they were last
+     * active and what they last did. At most every five minutes, and never at the cost of the backup itself.
+     */
+    private suspend fun publishUserSummary() {
+        val now = System.currentTimeMillis()
+        if (now - lastUserSummaryAt < USER_SUMMARY_MILLIS) return
+        try {
+            val user = FirebaseAuth.getInstance().currentUser?.takeIf { it.uid == uid } ?: return
+            val latest = db.readEvents(1).firstOrNull()
+            val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+            val summary = buildMap<String, Any> {
+                put("email", user.email.orEmpty())
+                put("name", user.displayName.orEmpty())
+                put("lastActiveAt", now)
+                put("platform", "android")
+                version?.let { put("appVersion", it) }
+                user.metadata?.creationTimestamp?.let { put("createdAt", it) }
+                latest?.let { put("lastEvent", it.summary); put("lastEventAt", it.at); put("lastEventType", it.type) }
+            }
+            withTimeout(WRITE_TIMEOUT_MILLIS) { userDoc().set(summary, SetOptions.merge()).await() }
+            lastUserSummaryAt = now
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Best effort: try again on the next sync.
+        }
     }
 
     /** Takes the cloud's profile when it is newer than this phone's and this phone has no profile change of its own waiting. */
@@ -245,6 +295,7 @@ class SyncManager(
 
     private companion object {
         const val POLL_MILLIS = 15_000L
+        const val USER_SUMMARY_MILLIS = 5 * 60_000L
         const val BATCH_SIZE = 400 // Firestore allows 500 writes per batch
         const val WRITE_TIMEOUT_MILLIS = 30_000L
         const val READ_TIMEOUT_MILLIS = 30_000L

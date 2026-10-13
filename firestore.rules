@@ -1,10 +1,66 @@
 rules_version = '2';
 
-// Each signed-in user can read and write only their own data, under users/{their uid}.
+// Strivo's Firestore rules.
+//
+//   users/{uid}            the user's profile summary, and everything under it (plans, workouts, food, activity events ...)
+//                          the user reads and writes their own; an admin can read everyone's but never change it
+//   library/{exerciseId}   the exercise library: every signed-in user reads it, only admins change it
+//   admins/{uid}           who is an admin; only an admin changes it. The first admin is created by hand in the
+//                          Firebase console (Firestore -> admins -> a document whose id is that person's uid)
+//
+// Anything not listed here is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Shape of a library exercise, so one bad write cannot break every phone that reads the library.
+    function validLibraryExercise() {
+      let d = request.resource.data;
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 100
+        && d.muscleGroup is string && d.muscleGroup.size() > 0 && d.muscleGroup.size() <= 40
+        && d.equipment is string && d.equipment.size() <= 40
+        && d.instructions is string && d.instructions.size() <= 4000
+        && d.defaultSets is int && d.defaultSets >= 1 && d.defaultSets <= 20
+        && d.defaultReps is int && d.defaultReps >= 1 && d.defaultReps <= 100
+        && d.defaultWeightKg is number && d.defaultWeightKg >= 0 && d.defaultWeightKg <= 1000
+        && d.active is bool;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid);
+
+      match /{document=**} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow write: if isOwner(uid);
+      }
+    }
+
+    // The admin's activity feed reads every user's events at once (a collection group query).
+    match /{path=**}/events/{eventId} {
+      allow read: if isAdmin();
+    }
+
+    match /library/{exerciseId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validLibraryExercise();
+      allow delete: if isAdmin();
+    }
+
+    match /admins/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
     }
   }
 }

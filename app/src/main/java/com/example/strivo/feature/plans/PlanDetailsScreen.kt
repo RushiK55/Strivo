@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -100,6 +101,7 @@ fun PlanDetailsScreen(
     exerciseViewModel: ExerciseViewModel,
     onBack: () -> Unit,
     onAddExercise: () -> Unit,
+    onOpenLibrary: () -> Unit = {},
     onEditExercise: (Exercise) -> Unit,
     onOpenExercise: (Exercise) -> Unit,
     onStartWorkout: () -> Unit,
@@ -201,6 +203,9 @@ fun PlanDetailsScreen(
                     IconButton(onClick = { shareText(context, ExerciseShare.encodePlan(plan.planName, items), "Share plan") }) {
                         Icon(Icons.Rounded.Share, contentDescription = "Share plan", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))
                     }
+                }
+                IconButton(onClick = onOpenLibrary) {
+                    Icon(Icons.Rounded.MenuBook, contentDescription = "Add from the exercise library", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))
                 }
                 IconButton(onClick = { showPaste = true }) {
                     Icon(Icons.Rounded.ContentPaste, contentDescription = "Paste exercises", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))

@@ -108,8 +108,9 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         reloadDay(selectedDay())
     }
 
+    /** Saves an exercise the user edited in its plan. */
     suspend fun updateExercise(exercise: Exercise) {
-        repository.updateExercise(exercise)
+        repository.editExercise(exercise)
         _exercises.value = repository.readExercisesByPlan(exercise.planId)
         reloadDay(selectedDay())
     }

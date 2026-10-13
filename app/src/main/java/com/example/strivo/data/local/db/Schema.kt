@@ -8,12 +8,39 @@ import android.database.sqlite.SQLiteDatabase
  */
 internal object Schema {
     /** Bump when a table changes, and add a step for it to [upgrade]. */
-    const val VERSION = 15
+    const val VERSION = 16
 
     /** The tables demo data writes to, which carry the isDemo mark. */
     val DemoTables = listOf("workout_sessions", "exercises", "plans", "food_log", "activity_log", "weight_log")
 
     private const val CREATE_WEIGHT_LOG = "CREATE TABLE IF NOT EXISTS weight_log (date TEXT PRIMARY KEY, weight REAL NOT NULL)"
+    /** What the user did, in plain words. Backed up to the cloud, where the admin dashboard reads it. */
+    private const val CREATE_ACTIVITY_EVENTS = """
+        CREATE TABLE IF NOT EXISTS activity_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          at INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          summary TEXT NOT NULL
+        )"""
+
+    /** The exercise library: a copy of what admins publish (or the starter library), read-only on the phone. */
+    private const val CREATE_LIBRARY = """
+        CREATE TABLE IF NOT EXISTS library_exercises (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          muscleGroup TEXT NOT NULL,
+          equipment TEXT NOT NULL,
+          level TEXT NOT NULL,
+          instructions TEXT NOT NULL,
+          tips TEXT NOT NULL,
+          defaultSets INTEGER NOT NULL,
+          defaultReps INTEGER NOT NULL,
+          defaultWeightKg REAL NOT NULL,
+          videoUrl TEXT NOT NULL,
+          active INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
+        )"""
+
     private const val CREATE_ACTIVITY_LOG = """
         CREATE TABLE IF NOT EXISTS activity_log (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,6 +120,8 @@ internal object Schema {
         db.execSQL(CREATE_WEIGHT_LOG)
         db.execSQL(CREATE_FOOD_LOG)
         db.execSQL(CREATE_ACTIVITY_LOG)
+        db.execSQL(CREATE_ACTIVITY_EVENTS)
+        db.execSQL(CREATE_LIBRARY)
         addDemoColumns(db)
         addPlannedDropSets(db)
         createSyncObjects(db)
@@ -103,6 +132,11 @@ internal object Schema {
         if (oldVersion < 9) db.execSQL(CREATE_WEIGHT_LOG)
         if (oldVersion < 10) db.execSQL(CREATE_FOOD_LOG)
         if (oldVersion < 11) db.execSQL(CREATE_ACTIVITY_LOG)
+        // Before the sync step below, which queues every synced table, this one included.
+        if (oldVersion < 16) {
+            db.execSQL(CREATE_ACTIVITY_EVENTS)
+            db.execSQL(CREATE_LIBRARY)
+        }
         if (oldVersion < 12) {
             createSyncObjects(db)
             // Everything saved before syncing existed has to be uploaded once, so queue every existing row.
@@ -161,6 +195,8 @@ internal object Schema {
         if (oldVersion < 14) addPlannedDropSets(db)
         // Plans and exercises carry the demo mark too, so demo plans can be removed with the rest of the demo data.
         if (oldVersion < 15) addDemoColumns(db)
+        // The sync step above only ran for databases older than 12; this adds the triggers for the activity table.
+        if (oldVersion in 12..15) createSyncObjects(db)
     }
 
     /**

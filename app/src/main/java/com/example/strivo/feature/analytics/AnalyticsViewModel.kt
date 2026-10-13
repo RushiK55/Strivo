@@ -127,6 +127,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
                 val saved = app.userPrefs.getProfile()
                 app.userPrefs.saveProfile(saved.gender ?: "Male", saved.age ?: 25, cm, saved.weight ?: 70.0)
             }
+            repository.recordProfileUpdated()
             load()
         }
     }

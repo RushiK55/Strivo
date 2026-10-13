@@ -2,9 +2,11 @@ package com.example.strivo.data.local.db
 
 import android.content.ContentValues
 import android.database.Cursor
+import com.example.strivo.domain.activity.ActivityEvent
 import com.example.strivo.domain.analytics.FoodEntry
 import com.example.strivo.domain.analytics.Meal
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.parseExerciseSets
@@ -100,3 +102,48 @@ internal fun Cursor.getIntOrZero(column: String): Int {
     val index = getColumnIndexOrThrow(column)
     return if (isNull(index)) 0 else getInt(index)
 }
+
+internal fun ActivityEvent.toValues() = ContentValues().apply {
+    put("at", at)
+    put("type", type)
+    put("summary", summary)
+}
+
+internal fun Cursor.toActivityEvent() = ActivityEvent(
+    id = getLong(getColumnIndexOrThrow("id")),
+    at = getLong(getColumnIndexOrThrow("at")),
+    type = getStringOrEmpty("type"),
+    summary = getStringOrEmpty("summary"),
+)
+
+internal fun LibraryExercise.toValues() = ContentValues().apply {
+    put("id", id)
+    put("name", name)
+    put("muscleGroup", muscleGroup)
+    put("equipment", equipment)
+    put("level", level)
+    put("instructions", instructions)
+    put("tips", tips)
+    put("defaultSets", defaultSets)
+    put("defaultReps", defaultReps)
+    put("defaultWeightKg", defaultWeightKg)
+    put("videoUrl", videoUrl)
+    put("active", if (active) 1 else 0)
+    put("updatedAt", updatedAt)
+}
+
+internal fun Cursor.toLibraryExercise() = LibraryExercise(
+    id = getStringOrEmpty("id"),
+    name = getStringOrEmpty("name"),
+    muscleGroup = getStringOrEmpty("muscleGroup"),
+    equipment = getStringOrEmpty("equipment"),
+    level = getStringOrEmpty("level"),
+    instructions = getStringOrEmpty("instructions"),
+    tips = getStringOrEmpty("tips"),
+    defaultSets = getIntOrZero("defaultSets"),
+    defaultReps = getIntOrZero("defaultReps"),
+    defaultWeightKg = getDouble(getColumnIndexOrThrow("defaultWeightKg")),
+    videoUrl = getStringOrEmpty("videoUrl"),
+    active = getIntOrZero("active") == 1,
+    updatedAt = getLong(getColumnIndexOrThrow("updatedAt")),
+)

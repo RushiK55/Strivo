@@ -186,6 +186,14 @@ fun ProfileScreen(
                 }
             }
 
+            // Said plainly: an admin can see this account's plans, workouts and activity, so the user is told.
+            Text(
+                "Your plans, workouts and activity are backed up to your account. The Strivo team can see them to help with support and to improve the app.",
+                style = AppType.Caption,
+                color = AppColors.TextTertiary,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),
+            )
+
             Spacer(Modifier.height(20.dp))
             AppCard(padding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)) {
                 SettingsRow(Icons.AutoMirrored.Rounded.Logout, "Log out", tint = AppColors.Danger, showChevron = false) { showLogout = true }

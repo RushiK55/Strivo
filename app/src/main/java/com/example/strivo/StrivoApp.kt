@@ -11,12 +11,14 @@ import com.example.strivo.data.local.prefs.UserPrefs
 import com.example.strivo.data.remote.AuthService
 import com.example.strivo.data.repository.StrivoRepository
 import com.example.strivo.data.sync.SyncManager
+import com.example.strivo.domain.model.LibraryExercise
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /** One account's storage: its own database and preferences, and the sync that keeps them in the cloud. */
 class UserScope(val prefs: UserPrefs, val repository: StrivoRepository, val sync: SyncManager)
@@ -82,10 +84,18 @@ class StrivoApp : Application() {
         LegacyData.claim(this, session, uid)
         val prefs = UserPrefs(this, uid)
         val db = StrivoDatabase(this, uid)
+        val repository = StrivoRepository(db, prefs)
+        // The exercise library works from the first launch, offline; the cloud's library replaces this one when it arrives.
+        appScope.launch { repository.seedLibraryIfEmpty(starterLibrary()) }
         UserScope(
             prefs = prefs,
-            repository = StrivoRepository(db, prefs),
+            repository = repository,
             sync = SyncManager(this, uid, db, prefs, onCloudDataApplied = { _cloudDataVersion.update { it + 1 } }),
         )
     }
+
+    /** The exercises that ship with the app (assets/library.json, the same file the admin dashboard can import). */
+    private fun starterLibrary(): List<LibraryExercise> =
+        runCatching { assets.open("library.json").bufferedReader().use { LibraryExercise.listFromJson(it.readText()) } }
+            .getOrDefault(emptyList())
 }

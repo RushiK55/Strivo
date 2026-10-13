@@ -33,6 +33,11 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sourceSets {
+        // The starter exercise library lives in admin/seed so the admin dashboard imports the very same file.
+        getByName("main").assets.directories += "../admin/seed"
+    }
 }
 
 dependencies {

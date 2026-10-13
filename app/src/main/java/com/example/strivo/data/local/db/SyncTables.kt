@@ -11,6 +11,7 @@ val SyncTables = listOf(
     SyncTable("food_log", "id", "food"),
     SyncTable("activity_log", "id", "activities"),
     SyncTable("weight_log", "date", "weights"),
+    SyncTable("activity_events", "id", "events"),
 )
 
 /** One entry of the local change log: some row of some table was inserted, updated or deleted. */

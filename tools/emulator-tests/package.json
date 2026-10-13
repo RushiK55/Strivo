@@ -1,0 +1,14 @@
+{
+  "name": "strivo-emulator-tests",
+  "private": true,
+  "description": "Tests that run against the Firebase emulators: the Firestore rules, and the admin dashboard in a real browser",
+  "scripts": {
+    "test": "firebase emulators:exec --only auth,firestore --project strivo-test --config ../../firebase.json \"node --test --test-concurrency=1\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^13.29.0",
+    "puppeteer-core": "^23.0.0"
+  }
+}

@@ -9,6 +9,8 @@ Gym workout planner and tracker — native Android, built with **Kotlin** and **
 - Analytics: volume, consistency, per-exercise progress and records, body weight trend, nutrition and energy expenditure
 - A coach that suggests the next weight (and a lighter week, protein, weigh-ins) from your own logs
 - Food and calorie log, body profile, cloud backup and restore
+- An exercise library (74 starter exercises, managed by an admin) that users browse and add to their plans
+- An admin web dashboard to follow each user's activity and manage the library (see [admin/README.md](admin/README.md))
 
 ## Stack
 
@@ -26,6 +28,9 @@ app/src/main/java/com/example/strivo/
   core/         shared theme, UI components and formatting
   domain/       models and the app's rules (analytics, coach, plan status), plain Kotlin
   data/         SQLite, preferences, Firebase, sync, repository, demo data
+
+admin/          the admin web dashboard (Next.js, exported as a static site for Firebase Hosting)
+tools/          tests that run on the Firebase emulators (security rules, the dashboard in a browser)
 ```
 
 Dependencies only point downwards, and a unit test enforces it. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
@@ -65,6 +70,15 @@ One-time setup in the Firebase console for this project:
 2. **Rules**: paste the contents of `firestore.rules` and publish.
 
 Until that is done the app still works fully offline, and Profile → "Cloud sync" shows what is wrong.
+
+## Admin dashboard and exercise library
+
+The admin dashboard is a separate web app in `admin/`. Setting it up means publishing `firestore.rules`, adding a Web app
+config, creating the first admin and deploying the site; the steps are in [admin/README.md](admin/README.md).
+
+The phone app records what a user does (a plain-language activity log) and a short summary of who they are, both backed
+up under `users/{uid}`. The library lives in `library/{exerciseId}`; every phone keeps a copy and starts with the 74
+exercises from `admin/seed/library.json`, which are bundled into the app.
 
 ## Firebase config (not in git)
 

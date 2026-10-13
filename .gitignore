@@ -29,3 +29,16 @@ google-services.json
 keystore.properties
 .env
 *.pem
+node_modules/
+
+# The admin dashboard: its Firebase web config (copy admin/.env.example), build output, and emulator logs
+admin/.env.local
+admin/.next/
+admin/out/
+admin/.test-build/
+admin/next-env.d.ts
+admin/*.tsbuildinfo
+firestore-debug.log
+ui-debug.log
+firebase-debug.log
+.firebase/

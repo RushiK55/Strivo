@@ -19,9 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +83,7 @@ fun HomeScreen(
     onOpenPlan: (Plan) -> Unit,
     onStartWorkout: (Plan) -> Unit,
     onAddExercise: (planId: Long) -> Unit,
+    onOpenLibrary: () -> Unit = {},
     advice: List<Advice> = emptyList(),
     onOpenCoach: () -> Unit = {},
     acceptLabel: (Advice) -> String? = { null },
@@ -163,6 +166,9 @@ fun HomeScreen(
                         color = AppColors.TextPrimary,
                         maxLines = 1,
                     )
+                }
+                IconButton(onClick = onOpenLibrary) {
+                    Icon(Icons.Rounded.MenuBook, contentDescription = "Exercise library", tint = AppColors.TextSecondary)
                 }
                 Avatar(name = auth.userName)
             }

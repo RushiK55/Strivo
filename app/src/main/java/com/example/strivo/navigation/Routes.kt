@@ -16,6 +16,7 @@ internal object Routes {
     const val SAVE_EXERCISE = "saveExercise/{planId}?exerciseId={exerciseId}&isExtra={isExtra}"
     const val EXERCISE_DETAILS = "exerciseDetails/{planId}/{exerciseId}"
     const val WORKOUT = "workout/{planId}"
+    const val LIBRARY = "library?planId={planId}"
 
     fun historyDetails(sessionId: Long) = "historyDetails/$sessionId"
     fun pickPlan(day: String) = "pickPlan/$day"
@@ -26,4 +27,7 @@ internal object Routes {
 
     fun exerciseDetails(planId: Long, exerciseId: Long) = "exerciseDetails/$planId/$exerciseId"
     fun workout(planId: Long) = "workout/$planId"
+
+    /** The exercise library; with a [planId] it was opened from that plan, so adding goes straight there. */
+    fun library(planId: Long? = null) = "library?planId=${planId ?: -1L}"
 }

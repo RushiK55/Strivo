@@ -35,6 +35,8 @@ import com.example.strivo.feature.food.FoodViewModel
 import com.example.strivo.feature.history.HistoryDetailsScreen
 import com.example.strivo.feature.history.HistoryScreen
 import com.example.strivo.feature.home.HomeScreen
+import com.example.strivo.feature.library.LibraryScreen
+import com.example.strivo.feature.library.LibraryViewModel
 import com.example.strivo.feature.plans.DayPlansScreen
 import com.example.strivo.feature.plans.ExerciseDetailsScreen
 import com.example.strivo.feature.plans.ExerciseViewModel
@@ -97,6 +99,7 @@ internal fun StrivoNavGraph(
                 onOpenPlan = { plan -> plan.planId?.let { navController.navigate(Routes.planDetails(it)) } },
                 onStartWorkout = { plan -> plan.planId?.let { navController.navigate(Routes.workout(it)) } },
                 onAddExercise = { planId -> navController.navigate(Routes.saveExercise(planId)) },
+                onOpenLibrary = { navController.navigate(Routes.library()) },
                 advice = coach.advice,
                 onOpenCoach = { navController.openTab(Routes.ANALYTICS) },
                 acceptLabel = coach::acceptLabel,
@@ -123,6 +126,18 @@ internal fun StrivoNavGraph(
                     navController.openTab(Routes.FOOD)
                 },
             )
+        }
+
+        composable(
+            Routes.LIBRARY,
+            arguments = listOf(navArgument("planId") { type = NavType.LongType; defaultValue = -1L }),
+        ) { entry ->
+            val planId = entry.arguments?.getLong("planId") ?: -1L
+            val libraryViewModel: LibraryViewModel = viewModel(
+                key = "library_$planId",
+                factory = viewModelFactory { initializer { LibraryViewModel(application, planId) } },
+            )
+            LibraryScreen(viewModel = libraryViewModel, onBack = { navController.popBackStack() })
         }
 
         composable(Routes.FOOD) {
@@ -201,6 +216,7 @@ internal fun StrivoNavGraph(
                     exerciseViewModel = exerciseViewModel,
                     onBack = { navController.popBackStack() },
                     onAddExercise = { navController.navigate(Routes.saveExercise(plan.planId)) },
+                    onOpenLibrary = { navController.navigate(Routes.library(plan.planId)) },
                     onEditExercise = { exercise ->
                         navController.navigate(Routes.saveExercise(plan.planId, exercise.id))
                     },
