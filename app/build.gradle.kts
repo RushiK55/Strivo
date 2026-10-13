@@ -56,6 +56,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation("junit:junit:4.13.2")
+    // The Android JSON classes are stubs in plain unit tests; this is the same API, so the set storage can be tested.
+    testImplementation("org.json:json:20240303")
 }
 
 // Firebase config comes from the Firebase console; the build still works without it

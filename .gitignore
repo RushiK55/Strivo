@@ -21,6 +21,8 @@ captures/
 
 # Secrets and signing: never commit these
 app/google-services.json
+# Also catches copies downloaded twice, such as "google-services (4).json"
+google-services*.json
 google-services.json
 *.jks
 *.keystore

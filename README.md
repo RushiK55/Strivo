@@ -2,36 +2,50 @@
 
 Gym workout planner and tracker — native Android, built with **Kotlin** and **Jetpack Compose**.
 
+## Features
+
+- Weekly plans with exercises, sets, reps, weight and drop sets; extra exercises for a single day
+- A workout screen with a timer, rest timers, set types (warm-up, drop, failure) and a full-screen focus mode
+- Analytics: volume, consistency, per-exercise progress and records, body weight trend, nutrition and energy expenditure
+- A coach that suggests the next weight (and a lighter week, protein, weigh-ins) from your own logs
+- Food and calorie log, body profile, cloud backup and restore
+
 ## Stack
 
 - Kotlin, Jetpack Compose (Material 3), Navigation Compose
 - ViewModel + StateFlow, Kotlin coroutines
-- SQLite (`SQLiteOpenHelper`) for plans, exercises and workout history — same schema/file as the old Flutter build, so existing data carries over
-- SharedPreferences for the login session and body profile
-- Firebase Authentication (email + password) for sign-in / sign-up
+- SQLite (`SQLiteOpenHelper`) for plans, exercises, workouts, food and weigh-ins; SharedPreferences for the session and profile
+- Firebase Authentication (email + password) and Cloud Firestore (backup and restore)
 
 ## Project layout
 
 ```
 app/src/main/java/com/example/strivo/
-  data/        models, SQLite database, repository, preferences, Firebase auth service
-  viewmodel/   Auth, Plan, Exercise, Profile and Workout view models
-  ui/          theme, shared components (wheel picker, headers…), screens, navigation
+  navigation/   routes, nav graph, bottom bar
+  feature/      one package per screen area (home, workout, plans, analytics, food, history, profile, auth, coach)
+  core/         shared theme, UI components and formatting
+  domain/       models and the app's rules (analytics, coach, plan status), plain Kotlin
+  data/         SQLite, preferences, Firebase, sync, repository, demo data
 ```
 
-## Build
+Dependencies only point downwards, and a unit test enforces it. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
+layers, the rules, how a screen is built, and how to add a feature.
+
+## Build and test
 
 Open the folder in Android Studio, or from a terminal:
 
 ```
-./gradlew :app:assembleDebug
+./gradlew :app:assembleDebug          # debug APK
+./gradlew :app:testDebugUnitTest      # unit tests, including the architecture rules
+./gradlew :app:assembleRelease        # minified release build (signed with the debug key for now)
 ```
 
 Requires JDK 17+ and the Android SDK (compileSdk 37).
 
 ## Firebase setup
 
-1. In the [Firebase console](https://console.firebase.google.com) create a project and add an **Android app** with package name `com.example.strivo`.
+1. In the [Firebase console](https://console.firebase.google.com) create a project and add an **Android app** with package name `strivo.app`.
 2. **Authentication → Sign-in method →** enable **Email/Password**.
 3. Download `google-services.json` and put it in `app/` (next to `app/build.gradle.kts`).
 4. Rebuild. The Realtime Database URL, if you ever need it, is the `firebase_url` field inside that file — Authentication itself doesn't use it.

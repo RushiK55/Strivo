@@ -1,5 +1,7 @@
 package com.example.strivo.data.sync
 
+import com.example.strivo.data.local.db.Change
+import com.example.strivo.data.local.db.SyncTables
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -3,8 +3,9 @@ package com.example.strivo.data.sync
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import com.example.strivo.data.db.StrivoDatabase
-import com.example.strivo.data.prefs.UserPrefs
+import com.example.strivo.data.local.db.StrivoDatabase
+import com.example.strivo.data.local.db.SyncTables
+import com.example.strivo.data.local.prefs.UserPrefs
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore

@@ -6,8 +6,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.strivo.ui.StrivoRoot
-import com.example.strivo.ui.theme.StrivoTheme
+import com.example.strivo.core.ui.theme.StrivoTheme
+import com.example.strivo.navigation.StrivoRoot
 
 class MainActivity : ComponentActivity() {
     override fun onStart() {
