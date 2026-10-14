@@ -195,6 +195,19 @@ export interface Assignment extends AssignmentFields {
   answeredAt?: number;
 }
 
+/**
+ * muscles/{muscleId}: what an admin wrote about a muscle of the 3D body. `subtitle` is a friendlier name shown under the muscle's
+ * name, `about` a description that replaces the built-in one; either may be empty (the built-in text is used). A muscle with nothing
+ * written has no document.
+ */
+export interface MuscleInfo {
+  id: string;
+  subtitle?: string;
+  about?: string;
+  updatedAt?: number;
+  updatedBy?: string;
+}
+
 /** admins/{uid} */
 export interface AdminEntry {
   id: string;

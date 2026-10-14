@@ -181,6 +181,49 @@ export function cleanMuscles(value: unknown): string[] {
   return [...new Set((Array.isArray(value) ? value : []).filter((id): id is string => typeof id === 'string' && MUSCLE_ID.test(id)))];
 }
 
+export const MAX_SUBTITLE = 60;
+export const MAX_ABOUT = 1000;
+
+export type MuscleInfoCheck =
+  | { ok: true; /** What to store: both empty when nothing of the muscle is overridden. */ value: { subtitle: string; about: string }; empty: boolean }
+  | { ok: false; errors: { subtitle?: string; about?: string } };
+
+/**
+ * Checks what an admin wrote about a muscle the way firestore.rules does. Text equal to the built-in description is not an
+ * override (it is stored empty, so a later improvement to the built-in text still shows); [empty] says nothing is overridden at
+ * all, so the muscle's document can be removed.
+ */
+export function validateMuscleInfo(input: { subtitle: string; about: string }, builtInAbout: string): MuscleInfoCheck {
+  const subtitle = input.subtitle.replace(/\s+/g, ' ').trim();
+  const about = input.about.trim();
+  const errors: { subtitle?: string; about?: string } = {};
+  if (subtitle.length > MAX_SUBTITLE) errors.subtitle = `Keep the subtitle to ${MAX_SUBTITLE} characters or fewer (it is ${subtitle.length}).`;
+  if (about.length > MAX_ABOUT) errors.about = `Keep the description to ${MAX_ABOUT} characters or fewer (it is ${about.length}).`;
+  if (errors.subtitle || errors.about) return { ok: false, errors };
+  const own = about === builtInAbout.trim() ? '' : about;
+  return { ok: true, value: { subtitle, about: own }, empty: !subtitle && !own };
+}
+
+export type MuscleRole = 'primary' | 'secondary' | null;
+
+/**
+ * The exercise's muscles with muscle [id] made a main muscle, a helper, or neither: it can only be one of them, so it is taken out
+ * of the other list first. Refuses when a list would be longer than the rules allow.
+ */
+export function withMuscleRole(
+  exercise: { primaryMuscles?: string[]; secondaryMuscles?: string[] },
+  id: string,
+  role: MuscleRole,
+): { ok: true; primaryMuscles: string[]; secondaryMuscles: string[] } | { ok: false; error: string } {
+  const primary = cleanMuscles(exercise.primaryMuscles).filter((muscle) => muscle !== id);
+  const secondary = cleanMuscles(exercise.secondaryMuscles).filter((muscle) => muscle !== id && !primary.includes(muscle));
+  if (role === 'primary') primary.push(id);
+  if (role === 'secondary') secondary.push(id);
+  if (primary.length > MAX_MUSCLES) return { ok: false, error: `An exercise can have at most ${MAX_MUSCLES} main muscles.` };
+  if (secondary.length > MAX_MUSCLES) return { ok: false, error: `An exercise can have at most ${MAX_MUSCLES} helping muscles.` };
+  return { ok: true, primaryMuscles: primary, secondaryMuscles: secondary };
+}
+
 /** A document id from a name: "Farmer's Walk" -> "farmer-s-walk". */
 export function slugify(name: string): string {
   return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);

@@ -1,7 +1,7 @@
 // The muscle catalogue the 3D body is built from (models/anatomy/muscles.json) and the pure rules around it: which library
 // exercises train a muscle, where the camera goes to look at one, and how a muscle is drawn when it is hovered or selected.
 // No React and no three.js in here, so it is all covered by muscles.test.ts.
-import type { LibraryExercise } from './types';
+import type { LibraryExercise, MuscleInfo } from './types';
 
 export type Vec3 = [number, number, number];
 export interface Box { min: Vec3; max: Vec3 }
@@ -22,6 +22,10 @@ export interface MuscleGroup {
   view: MuscleView;
   /** "deep" muscles lie under the surface ones and can only be seen when those are faded. */
   layer: MuscleLayer;
+  /** A friendlier name an admin gave it, shown under its name. */
+  subtitle?: string;
+  /** True when an admin has written something about it (a subtitle or a description of their own). */
+  edited?: boolean;
   male?: MuscleBody;
   female?: MuscleBody;
 }
@@ -58,6 +62,24 @@ export function muscleLabel(groups: MuscleGroup[] | undefined, id: string): stri
   if (found) return found.label;
   const text = id.replace(/-/g, ' ');
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * The catalogue's muscles with what admins wrote about them: the subtitle, and a description of their own in place of the built-in
+ * one when they wrote it. A muscle nobody wrote about is returned as it is. `label` never changes (the 3D body and the exercise
+ * lists go by it).
+ */
+export function withMuscleInfo(groups: MuscleGroup[], infos: MuscleInfo[] | undefined): MuscleGroup[] {
+  if (!infos?.length) return groups;
+  const byId = new Map(infos.map((info) => [info.id, info]));
+  return groups.map((group) => {
+    const info = byId.get(group.id);
+    if (!info) return group;
+    const subtitle = info.subtitle?.trim();
+    const about = info.about?.trim();
+    if (!subtitle && !about) return group;
+    return { ...group, ...(subtitle ? { subtitle } : {}), ...(about ? { about } : {}), edited: true };
+  });
 }
 
 export interface ExercisesForMuscle {

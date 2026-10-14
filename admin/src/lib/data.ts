@@ -6,7 +6,7 @@ import {
   where, writeBatch, type DocumentData, type OrderByDirection, type QueryDocumentSnapshot, type Query,
 } from 'firebase/firestore';
 import { getFirebase } from './firebase';
-import type { ActivityEvent, AdminEntry, Assignment, AssignmentFields, ClientWorkout, LibraryExercise, LibraryFields, NutritionDay, ProfileDoc, UserSummary } from './types';
+import type { ActivityEvent, AdminEntry, Assignment, AssignmentFields, ClientWorkout, LibraryExercise, LibraryFields, MuscleInfo, NutritionDay, ProfileDoc, UserSummary } from './types';
 
 const PAGE = 50;
 
@@ -129,6 +129,24 @@ export async function setLibraryMuscles(updates: { id: string; primaryMuscles: s
     await batch.commit();
   }
   return written;
+}
+
+// ---- What an admin wrote about the muscles ----
+
+/** Every note an admin has written about a muscle (a subtitle, a description), by muscle id. */
+export async function listMuscleInfo(): Promise<MuscleInfo[]> {
+  const snap = await getDocs(collection(db(), 'muscles'));
+  return snap.docs.map((d) => withId<MuscleInfo>(d));
+}
+
+/** Saves what is written about a muscle (both texts may be empty: the built-in text is used then). */
+export async function saveMuscleInfo(id: string, value: { subtitle: string; about: string }, adminUid: string): Promise<void> {
+  await setDoc(doc(db(), 'muscles', id), { ...value, updatedAt: Date.now(), updatedBy: adminUid });
+}
+
+/** Takes away everything written about a muscle, so it shows its built-in text again. */
+export async function resetMuscleInfo(id: string): Promise<void> {
+  await deleteDoc(doc(db(), 'muscles', id));
 }
 
 /** Writes the given exercises in batches (Firestore allows 500 writes per batch). Returns how many were written. */

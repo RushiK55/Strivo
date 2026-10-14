@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   actionsPerDay, cleanMuscles, describeSets, durationText, eventKinds, eventLabel, eventTone, filterLibrary, groupEventsByDay, initials, kindBreakdown, matchesUser, missingFromLibrary, safeSummary,
-  MUSCLE_GROUPS, musclesToFill, parseJsonField, relativeTime, sessionVolume, slugify, statusCounts, summarizeUsers, userStatus, validateLibraryExercise, weightSeries,
+  MAX_ABOUT, MAX_SUBTITLE, MUSCLE_GROUPS, musclesToFill, parseJsonField, relativeTime, sessionVolume, slugify, statusCounts, summarizeUsers, userStatus, validateLibraryExercise, validateMuscleInfo,
+  weightSeries, withMuscleRole,
 } from './logic';
 import type { LibraryExercise, LibraryInput } from './types';
 
@@ -263,5 +264,66 @@ describe('what a trainer may read of the activity lines', () => {
   it('leaves the lines without a food name alone', () => {
     expect(safeSummary('food_logged', 'Logged dinner (560 kcal, 32 g protein)')).toBe('Logged dinner (560 kcal, 32 g protein)');
     expect(safeSummary('workout_finished', 'Finished "Push Day": 2 exercises')).toBe('Finished "Push Day": 2 exercises');
+  });
+});
+
+describe('what an admin writes about a muscle', () => {
+  const builtIn = 'The broad wing-shaped muscle of the back.';
+
+  it('keeps a subtitle and a description of their own, tidied', () => {
+    const check = validateMuscleInfo({ subtitle: '  Back   wings ', about: ' The big muscle at the sides of the back. ' }, builtIn);
+    expect(check).toEqual({ ok: true, value: { subtitle: 'Back wings', about: 'The big muscle at the sides of the back.' }, empty: false });
+  });
+
+  it('does not count the built-in text as their own, so a later improvement to it still shows', () => {
+    const check = validateMuscleInfo({ subtitle: 'Wings', about: ` ${builtIn} ` }, builtIn);
+    expect(check).toEqual({ ok: true, value: { subtitle: 'Wings', about: '' }, empty: false });
+  });
+
+  it('says nothing is overridden when both are empty or the description is the built-in one', () => {
+    expect(validateMuscleInfo({ subtitle: '', about: '' }, builtIn)).toMatchObject({ ok: true, empty: true });
+    expect(validateMuscleInfo({ subtitle: '   ', about: builtIn }, builtIn)).toMatchObject({ ok: true, empty: true });
+  });
+
+  it('refuses text longer than the rules allow, and says by how much', () => {
+    const long = validateMuscleInfo({ subtitle: 'x'.repeat(MAX_SUBTITLE + 1), about: 'y'.repeat(MAX_ABOUT + 5) }, builtIn);
+    expect(long.ok).toBe(false);
+    if (!long.ok) {
+      expect(long.errors.subtitle).toContain(String(MAX_SUBTITLE + 1));
+      expect(long.errors.about).toContain(String(MAX_ABOUT + 5));
+    }
+    expect(validateMuscleInfo({ subtitle: 'x'.repeat(MAX_SUBTITLE), about: 'y'.repeat(MAX_ABOUT) }, builtIn).ok).toBe(true);
+  });
+});
+
+describe('making a muscle a main one, a helper or neither for an exercise', () => {
+  const exercise = { primaryMuscles: ['chest', 'triceps'], secondaryMuscles: ['delt-front'] };
+
+  it('adds it as a main muscle or a helper, at the end', () => {
+    expect(withMuscleRole(exercise, 'lats', 'primary')).toEqual({ ok: true, primaryMuscles: ['chest', 'triceps', 'lats'], secondaryMuscles: ['delt-front'] });
+    expect(withMuscleRole(exercise, 'lats', 'secondary')).toEqual({ ok: true, primaryMuscles: ['chest', 'triceps'], secondaryMuscles: ['delt-front', 'lats'] });
+  });
+
+  it('moves it from one list to the other, never in both', () => {
+    expect(withMuscleRole(exercise, 'triceps', 'secondary')).toEqual({ ok: true, primaryMuscles: ['chest'], secondaryMuscles: ['delt-front', 'triceps'] });
+    expect(withMuscleRole(exercise, 'delt-front', 'primary')).toEqual({ ok: true, primaryMuscles: ['chest', 'triceps', 'delt-front'], secondaryMuscles: [] });
+  });
+
+  it('takes it out of both when the role is none, and leaves an exercise that did not have it as it is', () => {
+    expect(withMuscleRole(exercise, 'chest', null)).toEqual({ ok: true, primaryMuscles: ['triceps'], secondaryMuscles: ['delt-front'] });
+    expect(withMuscleRole(exercise, 'lats', null)).toEqual({ ok: true, primaryMuscles: ['chest', 'triceps'], secondaryMuscles: ['delt-front'] });
+  });
+
+  it('works for an exercise with no muscles set, and tolerates rubbish in the lists', () => {
+    expect(withMuscleRole({}, 'lats', 'primary')).toEqual({ ok: true, primaryMuscles: ['lats'], secondaryMuscles: [] });
+    expect(withMuscleRole({ primaryMuscles: ['chest', 'chest', 'Not Valid', 5 as unknown as string] }, 'abs', 'primary')).toEqual({ ok: true, primaryMuscles: ['chest', 'abs'], secondaryMuscles: [] });
+  });
+
+  it('refuses a ninth main or helping muscle', () => {
+    const full = { primaryMuscles: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'], secondaryMuscles: ['i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'] };
+    expect(withMuscleRole(full, 'lats', 'primary')).toEqual({ ok: false, error: 'An exercise can have at most 8 main muscles.' });
+    expect(withMuscleRole(full, 'lats', 'secondary')).toEqual({ ok: false, error: 'An exercise can have at most 8 helping muscles.' });
+    expect(withMuscleRole(full, 'a', 'secondary')).toMatchObject({ ok: false }); // moving one over would make nine helpers
+    expect(withMuscleRole(full, 'a', null)).toMatchObject({ ok: true });
   });
 });

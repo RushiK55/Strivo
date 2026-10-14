@@ -140,7 +140,7 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
   write to a client's data.
 - **3D body.** `models/anatomy` (built by `tools/anatomy` from BodyParts3D, the Human Reference Atlas and Z-Anatomy data) holds a male and a female
   model with one node per muscle group and side, a skeleton and a smooth see-through skin layer over them (the female skin has a soft bust contour; no breast is drawn), and `muscles.json`, the
-  catalogue of 34 muscle groups. The dashboard's Body page shows it
+  catalogue of 34 muscle groups. The dashboard's Body page (admins can give a muscle a subtitle and a description of their own, kept in `muscles/{muscleId}`, and change which library exercises train it) shows it
   (three.js); the app will use the same files. A library exercise names the muscles it trains (`primaryMuscles`, `secondaryMuscles`: catalogue ids,
   in `library/{id}`, set in the dashboard; the starter library in `admin/seed/library.json` has them), which is how a clicked muscle lists its exercises.
 - **Emulator tests.** `tools/emulator-tests` runs the rules and the dashboard (in headless Chrome) against the Firebase

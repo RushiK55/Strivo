@@ -13,6 +13,8 @@ rules_version = '2';
 //                          then "accepted" (the plan goes onto the day the trainer chose) or "declined"; an answer is final.
 //                          Nobody else writes here, the client included, so what the trainer sees is what was sent.
 //   library/{exerciseId}   the exercise library: every signed-in user reads it, only admins change it
+//   muscles/{muscleId}     what an admin wrote about a muscle of the 3D body (a friendlier name, a description of their own):
+//                          every signed-in user reads it, only admins change it
 //   admins/{uid}           who is an admin; only an admin changes it. The first admin is created by hand in the
 //                          Firebase console (Firestore -> admins -> a document whose id is that person's uid)
 //
@@ -104,6 +106,23 @@ service cloud.firestore {
     // The admin's activity feed reads every user's events at once (a collection group query).
     match /{path=**}/events/{eventId} {
       allow read: if isAdmin();
+    }
+
+    // What an admin wrote about a muscle: a subtitle (a friendlier name) and a description that replaces the built-in one. Both may be
+    // empty (the built-in text is used); a muscle with nothing written has no document.
+    function validMuscleInfo() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['subtitle', 'about', 'updatedAt', 'updatedBy'])
+        && d.subtitle is string && d.subtitle.size() <= 60
+        && d.about is string && d.about.size() <= 1000
+        && d.updatedAt is int
+        && d.updatedBy == request.auth.uid;
+    }
+
+    match /muscles/{muscleId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && muscleId.matches('^[a-z]+(-[a-z]+)*$') && muscleId.size() <= 40 && validMuscleInfo();
+      allow delete: if isAdmin();
     }
 
     match /library/{exerciseId} {

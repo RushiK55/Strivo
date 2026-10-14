@@ -8,7 +8,7 @@ const { execSync } = require('node:child_process');
 const path = require('node:path');
 const puppeteer = require('puppeteer-core');
 const { initializeTestEnvironment } = require('@firebase/rules-unit-testing');
-const { doc, setDoc, updateDoc, getDocs, collection } = require('firebase/firestore');
+const { doc, setDoc, updateDoc, getDoc, getDocs, collection } = require('firebase/firestore');
 
 const ADMIN_DIR = path.join(__dirname, '../../admin');
 // The test build goes to its own folder, so it can never replace the build that is meant for the real project.
@@ -797,6 +797,129 @@ test('the body page: a full-page 3D body with a skin over the muscles, a three-l
   assert.ok(!(await text()).includes('Not in the female model'));
   await page.type('input[aria-label="Search muscles"]', 'zzzz');
   await waitForText('No muscle matches.');
+});
+
+test('the muscle card: an admin gives a muscle a subtitle and words of their own, and adds, moves, removes and writes its exercises', async () => {
+  const exercise = (name, group, extra) => ({ name, muscleGroup: group, equipment: 'Bodyweight', level: 'Beginner', instructions: `How to do ${name}.`, tips: '', defaultSets: 3, defaultReps: 10, defaultWeightKg: 0, videoUrl: '', active: true, ...extra });
+  await testEnv.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'library/e-edit-row'), exercise('Edit Row', 'Back', {})); });
+  const read = async (where) => { let snap; await testEnv.withSecurityRulesDisabled(async (ctx) => { snap = await getDoc(doc(ctx.firestore(), where)); }); return snap; };
+  const seen = (pattern) => page.waitForFunction((source) => new RegExp(source, 'i').test(document.body.innerText), { timeout: 15_000 }, pattern);
+  const goToBody = async () => { // (leaving the page and coming back starts it afresh, so what was saved is read from the cloud again)
+    await clickText('nav[aria-label="Main"] a', 'Library');
+    await waitForText('Exercise library');
+    await clickText('nav[aria-label="Main"] a', 'Body');
+    await page.waitForSelector('[data-testid="body-stage"]');
+  };
+  const openList = async () => {
+    if (!(await page.$('[data-testid="body-controls"]'))) { await page.click('[data-testid="controls-toggle"]'); await page.waitForSelector('[data-testid="body-controls"]'); }
+    if (!(await page.$('[data-testid="muscle-panel"]'))) await page.click('button[aria-label="Open the muscle list"]');
+    await page.waitForSelector('[data-muscle="feet"]');
+  };
+  // (The box slides while the camera flies to the muscle, so wait for that to end before clicking on it.)
+  const settle = (ms = 1200) => new Promise((resolve) => setTimeout(resolve, ms));
+  const openFeet = async () => { await openList(); await page.click('[data-muscle="feet"]'); await page.waitForSelector('[data-testid="muscle-title"]'); await settle(); };
+  const edit = async () => { await page.click('button[aria-label="Edit this muscle\'s info"]'); await page.waitForSelector('form[aria-label="Edit Feet"]'); };
+  const fill = async (selector, value) => { await page.$eval(selector, (e) => { e.focus(); e.select(); }); if (value) await page.type(selector, value); else await page.keyboard.press('Backspace'); };
+
+  await goToBody();
+  await openFeet();
+  assert.equal(await page.$eval('[data-testid="muscle-title"]', (e) => e.textContent), 'Feet');
+  assert.ok(!(await page.$('[data-testid="muscle-subtitle"]')), 'a muscle starts with no subtitle');
+  const builtIn = (await page.$eval('[data-testid="muscle-callout"] p', (e) => e.textContent));
+  assert.ok(builtIn.includes('small muscles of the sole'), 'and the built-in description');
+
+  // A subtitle and a description of their own.
+  await edit();
+  await fill('input[name="subtitle"]', 'Sole muscles');
+  await fill('textarea[name="about"]', 'Our own words about the feet.');
+  await shot('muscle-edit');
+  await page.click('form[aria-label="Edit Feet"] button[type="submit"]');
+  await waitForText('Our own words about the feet.');
+  assert.equal(await page.$eval('[data-testid="muscle-subtitle"]', (e) => e.textContent), 'Sole muscles');
+  assert.ok(!(await page.$('form[aria-label="Edit Feet"]')), 'the form closes when saved');
+  let saved = (await read('muscles/feet')).data();
+  assert.equal(saved.subtitle, 'Sole muscles');
+  assert.equal(saved.about, 'Our own words about the feet.');
+  assert.equal(saved.updatedBy, users.admin);
+  assert.ok(Number.isInteger(saved.updatedAt));
+  await assertNoLeaks('an edited muscle');
+
+  // Too long: said in the form, and nothing is written.
+  await edit();
+  await fill('input[name="subtitle"]', 'x'.repeat(70));
+  await page.click('form[aria-label="Edit Feet"] button[type="submit"]');
+  await waitForText('Keep the subtitle to 60 characters or fewer (it is 70).');
+  assert.equal((await read('muscles/feet')).data().subtitle, 'Sole muscles', 'a refused edit changes nothing');
+  await clickText('form[aria-label="Edit Feet"] button', 'Cancel');
+  assert.ok(!(await page.$('form[aria-label="Edit Feet"]')));
+
+  // What was written is there when the page is opened again, in the list's search and under the hover name, and the exercises count is unchanged.
+  await goToBody();
+  await openList();
+  await page.type('input[aria-label="Search muscles"]', 'sole muscles');
+  assert.deepEqual(await page.$$eval('[data-muscle]', (buttons) => buttons.map((b) => b.dataset.muscle)), ['feet'], 'the subtitle can be searched for');
+  await page.click('[data-muscle="feet"]');
+  await page.waitForSelector('[data-testid="muscle-subtitle"]');
+  await settle();
+  assert.equal(await page.$eval('[data-testid="muscle-subtitle"]', (e) => e.textContent), 'Sole muscles');
+  assert.ok((await text()).includes('Our own words about the feet.'), 'the description they wrote replaces the built-in one');
+  await shot('muscle-subtitle');
+
+  // Back to the built-in text.
+  await edit();
+  await clickText('form[aria-label="Edit Feet"] button', 'Reset to built-in');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="muscle-subtitle"]'), { timeout: 15_000 });
+  assert.ok((await text()).includes('small muscles of the sole'), 'the built-in description is back');
+  assert.ok(!(await read('muscles/feet')).exists(), 'and nothing is kept about the muscle');
+  // Writing the built-in text again is not an override either.
+  await edit();
+  await fill('input[name="subtitle"]', '');
+  await clickText('form[aria-label="Edit Feet"] button', 'Save');
+  await page.waitForFunction(() => !document.querySelector('form[aria-label="Edit Feet"]'), { timeout: 15_000 });
+  assert.ok(!(await read('muscles/feet')).exists(), 'saving it unchanged writes nothing');
+
+  // Exercises: none is set to train the feet to begin with; add one, make it a helper, take it off.
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => /^Show exercises \(\d+\)$/.test(b.innerText.trim())), { timeout: 15_000 });
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => /^Show exercises \(\d+\)$/.test(b.innerText.trim()))?.click());
+  await page.click('button[aria-label="Add an exercise to this muscle"]');
+  await page.waitForSelector('[data-testid="exercise-picker"]');
+  await page.type('input[aria-label="Search the library"]', 'Edit Row');
+  await page.click('button[aria-label="Add Edit Row as a main exercise"]');
+  await seen('Main exercises · 1');
+  assert.deepEqual((await read('library/e-edit-row')).data().primaryMuscles, ['feet']);
+  const open = () => page.evaluate(() => [...document.querySelectorAll('[data-testid="muscle-exercises"] button')].find((b) => b.innerText.startsWith('Edit Row'))?.click());
+  await open();
+  await waitForText('Make it a helper');
+  await settle(400); // (the accordion is still sliding open)
+  await clickText('button', 'Make it a helper');
+  await seen('Also works this muscle · 1');
+  let row = (await read('library/e-edit-row')).data();
+  assert.deepEqual([row.primaryMuscles, row.secondaryMuscles], [[], ['feet']], 'it moves from the main exercises to the helpers, not into both');
+  await open();
+  await waitForText('Make it a main exercise');
+  await settle(400);
+  await page.click('button[aria-label="Remove Edit Row from Feet"]');
+  await page.waitForFunction(() => !/Also works this muscle/i.test(document.body.innerText), { timeout: 15_000 });
+  row = (await read('library/e-edit-row')).data();
+  assert.deepEqual([row.primaryMuscles, row.secondaryMuscles], [[], []], 'taken off the muscle');
+  assert.equal(row.name, 'Edit Row', 'and nothing else of the exercise changed');
+
+  // A new exercise written for the muscle starts out training it.
+  await page.click('button[aria-label="Add an exercise to this muscle"]'); // (closes the picker)
+  await clickText('button', 'New exercise');
+  await page.waitForSelector('[role="dialog"] input[name="name"]');
+  assert.equal(await page.$eval('[role="dialog"] select[name="muscleGroup"]', (e) => e.value), 'Full body', 'in the muscle\'s own library group');
+  assert.ok(await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] button')].some((b) => b.innerText.includes('Add to library'))), 'and the form says it adds to the library');
+  await page.type('[role="dialog"] input[name="name"]', 'Toe Yoga');
+  await clickText('[role="dialog"] button', 'Add to library');
+  await waitForNoDialog();
+  await seen('Main exercises · 1');
+  assert.ok((await text()).includes('Toe Yoga'));
+  const fresh = (await read('library/toe-yoga')).data();
+  assert.deepEqual(fresh.primaryMuscles, ['feet']);
+  assert.equal(fresh.updatedBy, users.admin);
+  await shot('muscle-exercises');
+  await assertNoLeaks('the muscle card');
 });
 
 test('the team page lists the trainers and adds another', async () => {

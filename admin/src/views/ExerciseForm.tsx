@@ -107,7 +107,7 @@ export function ExerciseForm({ initial, onSave, onCancel }: ExerciseFormProps) {
       </Label>
       <div className="flex justify-end gap-2">
         <Button variant="outline" type="button" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" disabled={busy}>{initial ? 'Save changes' : 'Add to library'}</Button>
+        <Button type="submit" disabled={busy}>{initial?.name ? 'Save changes' : 'Add to library'}</Button>
       </div>
     </form>
   );

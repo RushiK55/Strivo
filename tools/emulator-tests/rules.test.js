@@ -189,6 +189,38 @@ test('an admin can add another admin', async () => {
   await assertSucceeds(getDocs(query(collectionGroup(as('second'), 'events'), orderBy('at', 'desc'), limit(10))));
 });
 
+// --- What an admin writes about a muscle ---
+
+const muscleNote = (over = {}) => ({ subtitle: 'Back wings', about: 'The wide muscle of the back.', updatedAt: 5, updatedBy: 'adminUid', ...over });
+
+test('an admin writes a note about a muscle, and only one of the right shape', async () => {
+  const db = as('adminUid');
+  await assertSucceeds(setDoc(doc(db, 'muscles/lats'), muscleNote()));
+  await assertSucceeds(setDoc(doc(db, 'muscles/delt-rear'), muscleNote({ subtitle: '', about: '' }))); // both may be empty
+  await assertSucceeds(setDoc(doc(db, 'muscles/lats'), muscleNote({ subtitle: 'Wings' }))); // and it can be changed
+  await assertFails(setDoc(doc(db, 'muscles/Lats'), muscleNote())); // an id that is not a muscle's
+  await assertFails(setDoc(doc(db, 'muscles/lats-1'), muscleNote()));
+  await assertFails(setDoc(doc(db, 'muscles/abs'), muscleNote({ subtitle: 'x'.repeat(61) })));
+  await assertFails(setDoc(doc(db, 'muscles/abs'), muscleNote({ about: 'x'.repeat(1001) })));
+  await assertSucceeds(setDoc(doc(db, 'muscles/abs'), muscleNote({ subtitle: 'x'.repeat(60), about: 'x'.repeat(1000) })));
+  await assertFails(setDoc(doc(db, 'muscles/chest'), muscleNote({ subtitle: 5 })));
+  await assertFails(setDoc(doc(db, 'muscles/chest'), muscleNote({ extra: true })));
+  await assertFails(setDoc(doc(db, 'muscles/chest'), muscleNote({ updatedBy: 'someoneElse' })));
+  await assertFails(setDoc(doc(db, 'muscles/chest'), muscleNote({ updatedAt: 'now' })));
+});
+
+test('everyone signed in reads the notes on the muscles, and only an admin can change or remove one', async () => {
+  await assertSucceeds(setDoc(doc(as('adminUid'), 'muscles/lats'), muscleNote()));
+  const alice = as('alice');
+  await assertSucceeds(getDoc(doc(alice, 'muscles/lats')));
+  await assertSucceeds(getDocs(collection(alice, 'muscles')));
+  await assertFails(setDoc(doc(alice, 'muscles/lats'), muscleNote({ updatedBy: 'alice' })));
+  await assertFails(setDoc(doc(alice, 'muscles/chest'), muscleNote({ updatedBy: 'alice' })));
+  await assertFails(deleteDoc(doc(alice, 'muscles/lats')));
+  await assertFails(getDoc(doc(anon(), 'muscles/lats')));
+  await assertSucceeds(deleteDoc(doc(as('adminUid'), 'muscles/lats')));
+});
+
 // --- Plans a trainer sends ---
 
 test('a trainer sends a plan to a client, and only a plan of the right shape', async () => {

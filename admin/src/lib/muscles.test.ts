@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SKIN_OPACITY, blendCamera, bodyCamera, cameraFor, countExercises, exercisesForMuscle, isPickable, lightnessShift, lookOf, muscleLabel, type Catalogue } from './muscles';
+import { SKIN_OPACITY, blendCamera, bodyCamera, cameraFor, countExercises, exercisesForMuscle, isPickable, lightnessShift, lookOf, muscleLabel, withMuscleInfo, type Catalogue } from './muscles';
 import type { LibraryExercise } from './types';
 
 const root = join(__dirname, '..', '..', '..');
@@ -52,6 +52,44 @@ describe('the catalogue the 3D body is built from', () => {
     const trained = new Set(seed.flatMap((item) => [...(item.primaryMuscles ?? []), ...(item.secondaryMuscles ?? [])]));
     const untrained = catalogue.groups.map((group) => group.id).filter((id) => !trained.has(id));
     expect(untrained.sort()).toEqual(['deep-back', 'feet', 'hands', 'hip-rotators', 'intercostals'].sort());
+  });
+});
+
+describe('what admins wrote about the muscles', () => {
+  const lats = () => catalogue.groups.find((group) => group.id === 'lats')!;
+
+  it('puts a subtitle under a muscle and replaces its description with the admin\'s own', () => {
+    const merged = withMuscleInfo(catalogue.groups, [{ id: 'lats', subtitle: ' Back wings ', about: 'Our own words.' }]);
+    const changed = merged.find((group) => group.id === 'lats')!;
+    expect(changed.subtitle).toBe('Back wings');
+    expect(changed.about).toBe('Our own words.');
+    expect(changed.edited).toBe(true);
+    expect(changed.label).toBe(lats().label); // the name never changes: the body and the lists go by it
+  });
+
+  it('keeps the built-in description when the admin wrote only a subtitle, and the other way round', () => {
+    const subtitleOnly = withMuscleInfo(catalogue.groups, [{ id: 'lats', subtitle: 'Wings', about: '' }]).find((group) => group.id === 'lats')!;
+    expect(subtitleOnly.about).toBe(lats().about);
+    expect(subtitleOnly.subtitle).toBe('Wings');
+    const aboutOnly = withMuscleInfo(catalogue.groups, [{ id: 'lats', about: 'Words' }]).find((group) => group.id === 'lats')!;
+    expect(aboutOnly.subtitle).toBeUndefined();
+    expect(aboutOnly.about).toBe('Words');
+  });
+
+  it('leaves the other muscles, a note with nothing in it and a note about no muscle alone', () => {
+    const merged = withMuscleInfo(catalogue.groups, [{ id: 'lats', subtitle: 'Wings' }, { id: 'chest', subtitle: '', about: '  ' }, { id: 'no-such-muscle', subtitle: 'x' }]);
+    expect(merged.length).toBe(catalogue.groups.length);
+    expect(merged.find((group) => group.id === 'chest')).toBe(catalogue.groups.find((group) => group.id === 'chest'));
+    expect(merged.find((group) => group.id === 'biceps')).toBe(catalogue.groups.find((group) => group.id === 'biceps'));
+    expect(merged.filter((group) => group.edited).map((group) => group.id)).toEqual(['lats']);
+    expect(withMuscleInfo(catalogue.groups, undefined)).toBe(catalogue.groups);
+    expect(withMuscleInfo(catalogue.groups, [])).toBe(catalogue.groups);
+  });
+
+  it('does not change the catalogue it was given', () => {
+    const before = lats().about;
+    withMuscleInfo(catalogue.groups, [{ id: 'lats', about: 'Changed' }]);
+    expect(lats().about).toBe(before);
   });
 });
 
