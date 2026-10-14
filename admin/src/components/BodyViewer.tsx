@@ -3,6 +3,7 @@
 // and reports what the user does in it (hover, click, loaded, failed). Everything it draws is in the scene class.
 import { useEffect, useRef } from 'react';
 import { BodyScene, type PickedMuscle } from '@/lib/bodyScene';
+import type { ScreenAnchor } from '@/lib/callout';
 import type { BodyKey, Catalogue } from '@/lib/muscles';
 
 export type ViewerStatus = 'loading' | 'ready' | 'error';
@@ -18,19 +19,21 @@ export interface BodyViewerProps {
   view: { side: 'front' | 'back'; n: number } | null;
   onSelect: (picked: PickedMuscle | null) => void;
   onHover: (id: string | null) => void;
+  /** Where the selected muscle is on the screen, as the camera moves (null when none is selected). */
+  onAnchor: (anchor: ScreenAnchor | null) => void;
   onStatus: (status: ViewerStatus, message?: string) => void;
 }
 
-export default function BodyViewer({ catalogue, body, selected, fade, skeleton, skin, view, onSelect, onHover, onStatus }: BodyViewerProps) {
+export default function BodyViewer({ catalogue, body, selected, fade, skeleton, skin, view, onSelect, onHover, onAnchor, onStatus }: BodyViewerProps) {
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<BodyScene | null>(null);
   // The latest of what the page chose, so the scene (made once) is always set up from current values.
   const latest = useRef({ body, selected, fade, skeleton, skin });
-  const callbacks = useRef({ onSelect, onHover, onStatus });
+  const callbacks = useRef({ onSelect, onHover, onAnchor, onStatus });
   // First of the effects, so the others always read the current values.
   useEffect(() => {
     latest.current = { body, selected, fade, skeleton, skin };
-    callbacks.current = { onSelect, onHover, onStatus };
+    callbacks.current = { onSelect, onHover, onAnchor, onStatus };
   });
 
   // The scene lives as long as the catalogue it was made for.
@@ -39,9 +42,13 @@ export default function BodyViewer({ catalogue, body, selected, fade, skeleton, 
     if (!element) return undefined;
     let made: BodyScene;
     try {
-      made = new BodyScene(element, catalogue, { onSelect: (picked) => callbacks.current.onSelect(picked), onHover: (id) => callbacks.current.onHover(id) });
+      made = new BodyScene(element, catalogue, {
+        onSelect: (picked) => callbacks.current.onSelect(picked),
+        onHover: (id) => callbacks.current.onHover(id),
+        onAnchor: (anchor) => callbacks.current.onAnchor(anchor),
+      });
     } catch {
-      callbacks.current.onStatus('error', 'This browser cannot show 3D (WebGL is switched off or not available). The muscle list on the right still works.');
+      callbacks.current.onStatus('error', 'This browser cannot show 3D (WebGL is switched off or not available). The Muscles button still lists every muscle.');
       return undefined;
     }
     scene.current = made;

@@ -564,7 +564,7 @@ test('the library: add, validate, hide, import the starter set and delete', asyn
   await waitForNoDialog();
 });
 
-test('the body page: a skin over the muscles; pick a muscle, the skin comes off, read about it and see the exercises that train it', async () => {
+test('the body page: a full-page 3D body with a skin over the muscles, a three-line button for the controls and credits in the corners; pick a muscle, the skin comes off and a box beside it, joined by a line, explains it and shows its exercises', async () => {
   // A few library exercises that say which muscles they train (and one that does not, and one that is hidden).
   const exercise = (name, group, extra) => ({ name, muscleGroup: group, equipment: 'Bodyweight', level: 'Beginner', instructions: `How to do ${name}.`, tips: '', defaultSets: 3, defaultReps: 10, defaultWeightKg: 0, videoUrl: '', active: true, ...extra });
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -578,15 +578,68 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
   const webgl = await (async () => { const probe = await browser.newPage(); const ok = await probe.evaluate(() => !!document.createElement('canvas').getContext('webgl2')); await probe.close(); return ok; })();
   const switchState = (label) => page.$eval(`[role="switch"][aria-label^="${label}"]`, (e) => e.getAttribute('aria-checked'));
   const skin = () => page.$eval('[data-testid="body-viewer"]', (e) => e.dataset.skin);
+  const rect = (selector) => page.$eval(selector, (e) => { const r = e.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; });
+  const openList = async () => { await page.click('button[aria-label="Open the muscle list"]'); await waitForText('Choose one, or click it on the body.'); };
+  // (The box slides while the camera flies to the muscle, so wait for that to end before clicking on it: a click on a box that has just moved would land on the body.)
+  const closeCard = async () => { await new Promise((resolve) => setTimeout(resolve, 1200)); await page.click('button[aria-label="Close the muscle card"]'); await page.waitForFunction(() => !document.querySelector('[data-testid="muscle-callout"]'), { timeout: 10_000 }); };
 
   await clickText('nav[aria-label="Main"] a', 'Body');
-  await waitForText('Click one on the body, or choose it here.');
-  await waitForText('Lats');
-  assert.ok((await text()).includes('Quadratus lumborum'), 'every muscle is in the list, deep ones too');
+  await page.waitForSelector('[data-testid="body-stage"]');
+  await page.waitForSelector('[data-testid="body-viewer"]'); // (the viewer's code loads a moment after the stage appears)
+  // A three-line button in the top right corner of the stage opens the control panel, which is closed to begin with so the body
+  // has the whole view.
+  const stageBox = await rect('[data-testid="body-stage"]');
+  const toggle = await rect('[data-testid="controls-toggle"]');
+  assert.ok(toggle.right > stageBox.right - 30 && toggle.top < stageBox.top + 30, 'the three-line button is in the top right corner of the stage');
+  assert.equal(await page.$eval('[data-testid="controls-toggle"] svg', (e) => e.getAttribute('class').includes('lucide-menu')), true, 'and it is a three-line (menu) icon');
+  assert.ok(!(await page.$('[data-testid="body-controls"]')), 'the control panel is closed to begin with');
+  assert.ok(!/fade surface|skeleton|full screen/i.test(await text()), 'and nothing of it shows (there is no full screen button at all)');
+  await shot('body-closed');
+  await page.click('[data-testid="controls-toggle"]');
+  await page.waitForSelector('[data-testid="body-controls"]');
+  assert.equal(await page.$eval('[data-testid="controls-toggle"]', (e) => e.getAttribute('aria-expanded')), 'true');
+  const controls = await rect('[data-testid="body-controls"]');
+  assert.ok(controls.right > stageBox.right - 30 && controls.top < stageBox.top + 80, 'the panel opens in the top right corner of the stage');
+  assert.ok(controls.width < stageBox.width / 3, 'and it is a small cluster, not a column across the page');
+  assert.ok(stageBox.width > 700, `the stage is wide (${stageBox.width}px)`);
+  // The 3D view fills the page under the top bar: edge to edge and down to the bottom of the window.
+  const window_ = await page.evaluate(() => ({ width: document.documentElement.clientWidth, height: window.innerHeight }));
+  assert.ok(Math.abs(stageBox.right - window_.width) < 2 && Math.abs(stageBox.bottom - window_.height) < 2, `the stage fills the page to the window's corner (${JSON.stringify(stageBox)} in ${JSON.stringify(window_)})`);
+  assert.ok(stageBox.height > window_.height * 0.8, 'and is most of the window tall');
+  // Its background is the same plain black as the rest of the dashboard: no grey, no gradient.
+  const looks = await page.$eval('[data-testid="body-stage"]', (e) => ({ stage: getComputedStyle(e).backgroundColor, image: getComputedStyle(e).backgroundImage, page: getComputedStyle(document.body).backgroundColor }));
+  assert.equal(looks.image, 'none', 'no gradient behind the body');
+  assert.equal(looks.stage, looks.page, 'the same background as the page');
+  assert.equal(looks.stage, 'rgb(0, 0, 0)', 'which is black');
+  const buttons = await page.$$eval('[data-testid="body-controls"] button', (list) => list.map((b) => b.innerText.trim()));
+  for (const name of ['Muscles', 'Front', 'Back', 'Reset']) assert.ok(buttons.some((text) => text.includes(name)), `the controls have ${name}`);
   assert.equal(await skin(), 'on', 'the body starts with its skin on');
   assert.equal(await switchState('Show the skin'), 'true');
   assert.equal(await switchState('Show the skeleton'), 'false', 'and no skeleton');
+  assert.ok(!(await text()).includes('Quadratus lumborum'), 'the list of muscles is closed until the Muscles button is pressed');
   await assertNoLeaks('the body page');
+
+  // The credits are a small button in the bottom right corner of the stage, and open a panel above it.
+  assert.ok(!(await text()).includes('CC BY-SA 4.0'), 'the credits are not spread over the page');
+  const creditsButton = await rect('[data-testid="credits-button"]');
+  assert.ok(creditsButton.right > stageBox.right - 30 && creditsButton.bottom > stageBox.bottom - 30, 'the credits button is in the bottom right corner');
+  // (A notice left over from the previous page, such as "Old Move deleted", can still be sitting in that corner for a few seconds: clear it first.)
+  await page.evaluate(() => document.querySelectorAll('[data-sonner-toast]').forEach((toast) => toast.remove()));
+  await page.click('[data-testid="credits-button"]');
+  await page.waitForSelector('[data-testid="credits-panel"]');
+  const credits = await text();
+  assert.ok(credits.includes('BodyParts3D') && credits.includes('Z-Anatomy') && credits.includes('CC BY-SA 4.0') && credits.includes('Human Reference Atlas'), 'the credits name every source');
+  const creditsPanel = await rect('[data-testid="credits-panel"]');
+  assert.ok(creditsPanel.right <= stageBox.right && creditsPanel.bottom <= creditsButton.top + 1, 'the credits panel opens above the button, inside the stage');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="credits-panel"]'), { timeout: 10_000 });
+
+  // The Muscles button opens the list of every muscle, over the stage, and closes it again.
+  await openList();
+  assert.ok((await text()).includes('Quadratus lumborum'), 'every muscle is in the list, deep ones too');
+  assert.equal(await page.$eval('[data-testid="body-controls"] button[aria-expanded]', (e) => e.getAttribute('aria-expanded')), 'true', 'the Muscles button shows that the list is open');
+  await page.click('[data-testid="muscle-panel"] button[aria-label="Close the muscle list"]');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="muscle-panel"]'), { timeout: 10_000 });
 
   if (webgl) {
     await page.waitForSelector('[data-testid="body-viewer"] canvas');
@@ -595,6 +648,7 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
     // Hovering the body names the muscle under the pointer (through the skin), and clicking it picks that muscle: this goes
     // through the real 3D scene.
     const box = await (await page.$('[data-testid="body-viewer"]')).boundingBox();
+    assert.ok(box.width > 700 && box.height > 450, 'the body has a big view');
     await shot('body-male');
     // Find a point on the body: try a few places down the middle, and wait a moment at each for the label.
     let at = null;
@@ -607,21 +661,35 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
     }
     assert.ok(at, 'hovering over the body names a muscle (the screenshot body-male shows what was drawn)');
     await page.mouse.click(at.x, at.y);
-    await page.waitForSelector('[data-testid="muscle-title"]', { timeout: 15_000 });
+    await page.waitForSelector('[data-testid="muscle-callout"]', { timeout: 15_000 });
     assert.notEqual(await page.$eval('[data-testid="body-viewer"]', (e) => e.dataset.selected), '', 'the click picked a muscle');
     assert.equal(await skin(), 'off', 'picking a muscle takes the skin off');
     assert.equal(await switchState('Show the skin'), 'false');
+    // The box floats in the stage, clear of the controls, and a line joins it to the muscle.
+    await page.waitForSelector('[data-testid="callout-line"]', { timeout: 10_000 });
+    await new Promise((resolve) => setTimeout(resolve, 1200)); // let the camera finish flying to it
+    const card = await rect('[data-testid="muscle-callout"]');
+    const now = await rect('[data-testid="body-stage"]');
+    assert.ok(card.left >= now.left && card.right <= now.right && card.top >= now.top && card.bottom <= now.bottom, 'the box is inside the stage');
+    const controlsNow = await rect('[data-testid="body-controls"]');
+    assert.ok(card.right <= controlsNow.left || card.bottom <= controlsNow.top || card.left >= controlsNow.right, 'and does not cover the controls');
+    const line = await page.$eval('[data-testid="callout-line"] line', (e) => ({ x1: +e.getAttribute('x1'), y1: +e.getAttribute('y1'), x2: +e.getAttribute('x2'), y2: +e.getAttribute('y2') }));
+    assert.ok(line.x1 >= 0 && line.x1 <= now.width && line.y1 >= 0 && line.y1 <= now.height, `the line starts on the muscle, inside the view (${JSON.stringify(line)})`);
+    assert.ok(Math.abs(line.x2 - (card.right - now.left)) < 2 || Math.abs(line.x2 - (card.left - now.left)) < 2, 'and ends on the edge of the box');
+    await shot('body-callout');
     await page.click('button:has(svg.lucide-rotate-ccw)');
-    await waitForText('Click one on the body, or choose it here.');
+    await page.waitForFunction(() => !document.querySelector('[data-testid="muscle-callout"]'), { timeout: 10_000 });
     assert.equal(await skin(), 'on', 'resetting puts the skin back');
   } else {
     assert.ok((await text()).includes('cannot show 3D'), 'without WebGL the page says so and the list still works');
   }
 
-  // Choose a muscle from the list: its text, and the exercises behind the button.
+  // Choose a muscle from the list: the list closes, and the box says what it is, with the exercises behind its button.
+  await openList();
   await page.click('[data-muscle="lats"]');
   await waitForText('The latissimus dorsi');
   assert.equal(await page.$eval('[data-testid="muscle-title"]', (e) => e.textContent), 'Lats');
+  assert.ok(!(await page.$('[data-testid="muscle-panel"]')), 'the list closes when a muscle is picked from it');
   assert.equal(await skin(), 'off', 'the skin is off for a muscle chosen from the list too');
   // (The library also holds the starter exercises the library test imported, so the count is at least these four.)
   await waitForText('Show exercises (');
@@ -637,6 +705,10 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
   const exercises = await text();
   assert.ok(exercises.includes('Body Pull-Up') && exercises.includes('Body Row') && exercises.includes('Body Curl') && exercises.includes('Body Old Back'));
   assert.ok(!exercises.includes('Body Hidden'), 'a hidden exercise is not listed');
+  // the exercises are inside the box (it scrolls), which stays inside the stage
+  const full = await rect('[data-testid="muscle-callout"]');
+  const stageNow = await rect('[data-testid="body-stage"]');
+  assert.ok(full.top >= stageNow.top && full.bottom <= stageNow.bottom, 'the box with its exercises still fits the stage');
   // the exercise opens to show how to do it (its button also holds the equipment line, so it is found by its start)
   await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.innerText.startsWith('Body Pull-Up'))?.click());
   await waitForText('How to do Body Pull-Up.');
@@ -644,8 +716,11 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
   await shot('body-lats');
   if (webgl) assert.equal(await page.$eval('[data-testid="body-viewer"]', (e) => e.dataset.selected), 'lats');
 
-  // Another muscle can be picked while one is: the list is behind "All muscles", and the body keeps up.
-  await clickText('button', 'All muscles');
+  // Escape closes the box and puts the skin back; another muscle can be picked from the list.
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="muscle-callout"]'), { timeout: 10_000 });
+  assert.equal(await skin(), 'on');
+  await openList();
   await page.click('[data-muscle="mid-back"]');
   await waitForText('The middle and lower trapezius');
   assert.equal(await page.$eval('[data-testid="muscle-title"]', (e) => e.textContent), 'Mid back');
@@ -656,25 +731,35 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
   }
 
   // A deep muscle cannot be seen under the surface, so picking it fades the surface layer; picking a surface one again undoes that.
-  await clickText('button', 'All muscles');
+  await openList();
   await page.click('[data-muscle="quadratus-lumborum"]');
   await waitForText('Deep muscle');
   assert.equal(await switchState('Fade the surface'), 'true');
   assert.equal(await skin(), 'off');
   if (webgl) await new Promise((resolve) => setTimeout(resolve, 1200)); // let the camera finish flying to it
   await shot('body-deep');
-  await clickText('button', 'All muscles');
+  await openList();
   await page.click('[data-muscle="lats"]');
   await waitForText('The latissimus dorsi');
   assert.equal(await switchState('Fade the surface'), 'false', 'the fade that picking a deep muscle switched on goes off with it');
 
   // The skin can also be switched on and off by hand.
-  await clickText('button', 'All muscles');
-  assert.equal(await skin(), 'on', 'leaving a muscle puts the skin back');
+  await closeCard();
+  assert.equal(await skin(), 'on', 'closing the box puts the skin back');
   await page.click('[role="switch"][aria-label="Show the skin"]');
   assert.equal(await skin(), 'off');
   await page.click('[role="switch"][aria-label="Show the skin"]');
   assert.equal(await skin(), 'on');
+
+  // The three-line button closes the panel again (and Escape does too, once nothing else is open), and opens it once more.
+  await page.click('[data-testid="controls-toggle"]');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="body-controls"]'), { timeout: 10_000 });
+  await page.click('[data-testid="controls-toggle"]');
+  await page.waitForSelector('[data-testid="body-controls"]');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="body-controls"]'), { timeout: 10_000 });
+  await page.click('[data-testid="controls-toggle"]');
+  await page.waitForSelector('[data-testid="body-controls"]');
 
   // The female body loads too, and the same muscles are there.
   await clickText('[data-slot="toggle-group-item"]', 'Female');
@@ -683,6 +768,7 @@ test('the body page: a skin over the muscles; pick a muscle, the skin comes off,
     await new Promise((resolve) => setTimeout(resolve, 600));
     await shot('body-female');
   }
+  await openList();
   assert.ok(!(await text()).includes('Not in the female model'));
   await page.type('input[aria-label="Search muscles"]', 'zzzz');
   await waitForText('No muscle matches.');

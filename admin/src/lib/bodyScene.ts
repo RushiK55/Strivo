@@ -9,13 +9,13 @@
 // its number, and the pixel under the pointer says which one it is. That costs the same however many triangles there are,
 // where testing rays against 130,000 triangles on every mouse move would make hovering sluggish.
 import {
-  Color, DirectionalLight, HemisphereLight, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, Scene,
-  WebGLRenderer, WebGLRenderTarget, type Object3D,
+  Color, DirectionalLight, HemisphereLight, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, Raycaster, Scene,
+  Vector3, WebGLRenderer, WebGLRenderTarget, type Object3D,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
-  MODELS_URL, SKIN_OPACITY, blendCamera, bodyCamera, cameraFor, isPickable, lightnessShift, lookOf, type BodyKey, type Catalogue, type CameraSpot, type DrawState, type MuscleLayer,
+  MODELS_URL, SKIN_OPACITY, blendCamera, bodyCamera, cameraFor, isPickable, lightnessShift, lookOf, type BodyKey, type Box, type Catalogue, type CameraSpot, type DrawState, type MuscleLayer,
 } from './muscles';
 
 export interface PickedMuscle { id: string; side: string }
@@ -25,6 +25,8 @@ export interface SceneEvents {
   onSelect: (picked: PickedMuscle | null) => void;
   /** The pointer moved onto a muscle or off it. */
   onHover: (id: string | null) => void;
+  /** Where the selected muscle is on the screen (pixels from the top left of the view), reported as the camera moves; null when none is selected. */
+  onAnchor: (anchor: { x: number; y: number; visible: boolean } | null) => void;
 }
 
 interface Part { mesh: Mesh; id: string; side: string; layer: MuscleLayer; pick: MeshBasicMaterial }
@@ -66,6 +68,9 @@ export class BodyScene {
   private others: Mesh[] = []; // meshes that cannot be picked (the skeleton and the skin)
   private draw: DrawState = { selected: null, hovered: null, fade: false };
   private selectedSide: string | null = null;
+  /** A point on the selected muscle's surface that the page draws its line to. */
+  private anchor: Vector3 | null = null;
+  private anchorShown = false;
   private showSkeleton = false;
   private skinOn = true;
   private skinOpacity = SKIN_OPACITY;
@@ -135,6 +140,7 @@ export class BodyScene {
     const first = !this.framed;
     this.framed = true;
     if (first || this.draw.selected) this.flyToSelection(false);
+    this.placeAnchor();
   }
 
   /** Selects a muscle (or, with null, none) and flies the camera to it, or back to the whole body. */
@@ -142,7 +148,7 @@ export class BodyScene {
     this.draw = { ...this.draw, selected: id };
     this.selectedSide = side;
     this.applyLooks();
-    if (this.framed) this.flyToSelection(true); // before a body is loaded there is nowhere to fly from: load() frames it
+    if (this.framed) { this.flyToSelection(true); this.placeAnchor(); } // before a body is loaded there is nowhere to fly from: load() frames it
   }
 
   setFade(fade: boolean): void {
@@ -309,14 +315,55 @@ export class BodyScene {
     this.fly = { from: here, to: spot, start: performance.now(), duration: FLY_MS };
   }
 
-  /** To the selected muscle (its clicked side when there is one), or back to the front of the whole body. */
-  private flyToSelection(animate: boolean): void {
+  /** Where the camera goes for the selected muscle (its clicked side when there is one), or null when none is selected or it is not in this body. */
+  private selectionSpot(): { spot: CameraSpot; box: Box } | null {
     const id = this.draw.selected;
     const group = id ? this.catalogue.groups.find((candidate) => candidate.id === id) : undefined;
     const info = group?.[this.body];
-    if (!group || !info) { this.flyTo(bodyCamera(this.catalogue.bodies[this.body].box, 'front', this.size()), animate); return; }
+    if (!group || !info) return null;
     const box = (this.selectedSide && info.sides[this.selectedSide]) || info.box;
-    this.flyTo(cameraFor(box, group.view, this.size()), animate);
+    return { spot: cameraFor(box, group.view, this.size()), box };
+  }
+
+  /** To the selected muscle, or back to the front of the whole body. */
+  private flyToSelection(animate: boolean): void {
+    const target = this.selectionSpot();
+    this.flyTo(target ? target.spot : bodyCamera(this.catalogue.bodies[this.body].box, 'front', this.size()), animate);
+  }
+
+  /**
+   * Finds the point the page's line runs to: on the selected muscle's own surface, where the camera will be looking at it. A ray
+   * is shot from where the camera is going toward the middle of the muscle and the first place it meets the muscle is used (the
+   * middle of the muscle's box itself can float beside a thin muscle).
+   */
+  private placeAnchor(): void {
+    const target = this.selectionSpot();
+    if (!target) { this.anchor = null; return; }
+    const { spot, box } = target;
+    const middle = new Vector3(...spot.target);
+    const origin = new Vector3(...spot.position);
+    const meshes = this.parts.filter((part) => part.id === this.draw.selected).map((part) => part.mesh);
+    const ray = new Raycaster(origin, middle.clone().sub(origin).normalize(), 0.01, 10);
+    this.model?.updateMatrixWorld(true);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    this.anchor = hit ? hit.point.clone() : new Vector3((box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2);
+    this.anchorShown = false; // report it on the next frame even if the screen place happens to match
+  }
+
+  /** Tells the page where the anchor is on the screen now. */
+  private reportAnchor(): void {
+    if (!this.anchor) {
+      if (this.anchorShown) { this.anchorShown = false; this.events.onAnchor(null); }
+      return;
+    }
+    this.camera.updateMatrixWorld();
+    const projected = this.anchor.clone().project(this.camera);
+    this.anchorShown = true;
+    this.events.onAnchor({
+      x: (projected.x * 0.5 + 0.5) * this.host.clientWidth,
+      y: (-projected.y * 0.5 + 0.5) * this.host.clientHeight,
+      visible: projected.z > -1 && projected.z < 1,
+    });
   }
 
   private stepFly(): void {
@@ -411,8 +458,11 @@ export class BodyScene {
       this.setHovered(this.pickAt(this.pointer.x, this.pointer.y)?.id ?? null);
     }
     if (moved || this.dirty) {
+      this.reportAnchor();
       this.dirty = false;
       this.renderer.render(this.scene, this.camera);
+    } else if (!this.anchor && this.anchorShown) {
+      this.reportAnchor();
     }
   };
 }
