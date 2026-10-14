@@ -3,6 +3,8 @@ package com.example.strivo.data.local.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.strivo.core.util.todayIso
+import com.example.strivo.domain.body.MuscleNote
+import com.example.strivo.domain.body.MuscleNotes
 import com.example.strivo.domain.plan.PlanAssignment
 import com.example.strivo.domain.plan.ReceivedPlan
 import java.time.DayOfWeek
@@ -199,6 +201,15 @@ class UserPrefs(context: Context, uid: String) {
         prefs.edit().putStringSet(KEY_FINISHED_PLANS, (kept + entries).toSet()).apply()
     }
 
+    // --- What admins wrote about the muscles ---
+
+    /** The subtitles and descriptions admins gave the muscles of the 3D body, as last read from the cloud (so they show offline too). */
+    fun getMuscleNotes(): Map<String, MuscleNote> = MuscleNotes.fromJson(prefs.getString(KEY_MUSCLE_NOTES, null))
+
+    fun setMuscleNotes(notes: Map<String, MuscleNote>) {
+        prefs.edit().putString(KEY_MUSCLE_NOTES, MuscleNotes.toJson(notes)).apply()
+    }
+
     // --- Plans from the trainer ---
     // A plan the trainer sends is an offer until the user answers it: accepted (it is added to their plans and remembered here, so
     // it is never added twice) or declined (remembered here, so it never comes back). The cloud is told the answer afterwards.
@@ -281,6 +292,7 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_FINISHED_PLANS = "finished_plans"
         private const val KEY_RECEIVED_PLANS = "received_plans"
         private const val KEY_PLAN_OFFERS = "plan_offers"
+        private const val KEY_MUSCLE_NOTES = "muscle_notes"
         private const val KEY_DECLINED_PLANS = "declined_plans"
         private const val KEY_PENDING_ANSWERS = "plan_answers"
         private const val MARKER = -1L // stands for the plan itself in a finished-plans entry

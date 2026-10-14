@@ -85,7 +85,7 @@ class ArchitectureTest {
     @Test
     fun featuresDoNotOpenEachOtherUpExceptWhereAllowed() {
         val allowed = mapOf(
-            "feature.home" to setOf("feature.auth", "feature.coach", "feature.plans", "feature.profile"),
+            "feature.home" to setOf("feature.auth", "feature.body", "feature.coach", "feature.plans", "feature.profile"),
             "feature.analytics" to setOf("feature.coach"),
             "feature.history" to setOf("feature.plans"),
             "feature.profile" to setOf("feature.auth"),

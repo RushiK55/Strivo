@@ -130,6 +130,8 @@ internal fun LibraryExercise.toValues() = ContentValues().apply {
     put("videoUrl", videoUrl)
     put("active", if (active) 1 else 0)
     put("updatedAt", updatedAt)
+    put("primaryMuscles", LibraryExercise.musclesToText(primaryMuscles))
+    put("secondaryMuscles", LibraryExercise.musclesToText(secondaryMuscles))
 }
 
 internal fun Cursor.toLibraryExercise() = LibraryExercise(
@@ -146,4 +148,6 @@ internal fun Cursor.toLibraryExercise() = LibraryExercise(
     videoUrl = getStringOrEmpty("videoUrl"),
     active = getIntOrZero("active") == 1,
     updatedAt = getLong(getColumnIndexOrThrow("updatedAt")),
+    primaryMuscles = LibraryExercise.musclesFromText(getStringOrEmpty("primaryMuscles")),
+    secondaryMuscles = LibraryExercise.musclesFromText(getStringOrEmpty("secondaryMuscles")),
 )

@@ -101,4 +101,44 @@ class LibraryExerciseTest {
         }
         assertNotNull(seed.firstOrNull { it.name == "Bench Press" })
     }
+
+    // --- The muscles an exercise trains ---
+
+    @Test
+    fun theMusclesAnExerciseTrainsAreReadFromTheCloudAndCleaned() {
+        val exercise = LibraryExercise.fromMap(
+            "row",
+            mapOf(
+                "name" to "Row",
+                "primaryMuscles" to listOf("lats", " mid-back ", "lats", "Not Valid", 5L, "delt-rear"),
+                "secondaryMuscles" to listOf("biceps", "x1", "forearm-flexors"),
+            ),
+        )!!
+        assertEquals(listOf("lats", "mid-back", "delt-rear"), exercise.primaryMuscles)
+        assertEquals(listOf("biceps", "forearm-flexors"), exercise.secondaryMuscles)
+        val none = LibraryExercise.fromMap("plank", mapOf("name" to "Plank"))!!
+        assertTrue(none.primaryMuscles.isEmpty() && none.secondaryMuscles.isEmpty())
+        val tooMany = LibraryExercise.fromMap("x", mapOf("name" to "X", "primaryMuscles" to ('a'..'z').map { "m$it" }))!!
+        assertEquals(LibraryExercise.MAX_MUSCLES, tooMany.primaryMuscles.size)
+    }
+
+    @Test
+    fun theMusclesSurviveJsonAndTheDatabaseText() {
+        val original = LibraryExercise("row", "Row", "Back", "", "", "", "", 3, 10, 0.0, "", true, 0, listOf("lats", "mid-back"), listOf("biceps"))
+        assertEquals(original, LibraryExercise.fromJson(JSONObject(original.toJson().toString())))
+        assertEquals("lats,mid-back", LibraryExercise.musclesToText(original.primaryMuscles))
+        assertEquals(listOf("lats", "mid-back"), LibraryExercise.musclesFromText("lats,mid-back"))
+        assertTrue(LibraryExercise.musclesFromText("").isEmpty())
+        assertTrue(LibraryExercise.musclesFromText(null).isEmpty())
+        assertEquals(listOf("lats"), LibraryExercise.musclesFromText(",lats,,Bad,"))
+    }
+
+    @Test
+    fun everyStarterExerciseSaysWhichMusclesItTrains() {
+        assertTrue(seed.isNotEmpty())
+        for (exercise in seed) {
+            assertTrue("${exercise.name} has no main muscles", exercise.primaryMuscles.isNotEmpty())
+            assertTrue("${exercise.name} lists a muscle twice", (exercise.primaryMuscles + exercise.secondaryMuscles).let { it.size == it.distinct().size })
+        }
+    }
 }

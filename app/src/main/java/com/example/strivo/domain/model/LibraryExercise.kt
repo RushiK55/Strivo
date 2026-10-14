@@ -22,6 +22,9 @@ data class LibraryExercise(
     val active: Boolean,
     /** Epoch milliseconds of the last change in the cloud; 0 for the exercises that ship with the app. */
     val updatedAt: Long = 0,
+    /** The muscles it trains mainly and the ones it helps (ids from the muscle catalogue, such as "delt-rear"); empty when not set. */
+    val primaryMuscles: List<String> = emptyList(),
+    val secondaryMuscles: List<String> = emptyList(),
 ) {
     /** What is added to a plan: the exercise with its suggested sets, reps and weight. */
     fun toPlanExercise(planId: Long) = Exercise(
@@ -47,6 +50,8 @@ data class LibraryExercise(
         .put("videoUrl", videoUrl)
         .put("active", active)
         .put("updatedAt", updatedAt)
+        .put("primaryMuscles", JSONArray(primaryMuscles))
+        .put("secondaryMuscles", JSONArray(secondaryMuscles))
 
     companion object {
         /** Reads one exercise; null when it has no id or name, so one bad entry never hides the rest. */
@@ -68,6 +73,8 @@ data class LibraryExercise(
                 videoUrl = json.optString("videoUrl").trim(),
                 active = json.optBoolean("active", true),
                 updatedAt = json.optLong("updatedAt", 0),
+                primaryMuscles = cleanMuscleIds(json.optJSONArray("primaryMuscles")?.let { array -> List(array.length()) { array.opt(it) } }),
+                secondaryMuscles = cleanMuscleIds(json.optJSONArray("secondaryMuscles")?.let { array -> List(array.length()) { array.opt(it) } }),
             )
         }
 
@@ -93,8 +100,24 @@ data class LibraryExercise(
                 videoUrl = text("videoUrl"),
                 active = data["active"] as? Boolean ?: true,
                 updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: 0L,
+                primaryMuscles = cleanMuscleIds(data["primaryMuscles"] as? List<*>),
+                secondaryMuscles = cleanMuscleIds(data["secondaryMuscles"] as? List<*>),
             )
         }
+
+        /** The most muscles an exercise can name in each list (the cloud rules allow the same). */
+        const val MAX_MUSCLES = 8
+
+        private val MuscleId = Regex("^[a-z]+(-[a-z]+)*$")
+
+        /** The distinct, well-formed muscle ids of a list, in order, at most [MAX_MUSCLES]; anything else in it is dropped. */
+        fun cleanMuscleIds(values: List<*>?): List<String> =
+            values.orEmpty().filterIsInstance<String>().map { it.trim() }.filter { MuscleId.matches(it) }.distinct().take(MAX_MUSCLES)
+
+        /** The muscles as one text for the database: ids joined by commas (an id never has a comma in it). */
+        fun musclesToText(ids: List<String>): String = ids.joinToString(",")
+
+        fun musclesFromText(text: String?): List<String> = cleanMuscleIds(text.orEmpty().split(',').filter { it.isNotBlank() })
 
         /** Reads a list; entries that cannot be read are skipped. */
         fun listFromJson(text: String): List<LibraryExercise> = runCatching {

@@ -63,6 +63,7 @@ import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.plan.isPlanDoneToday
 import com.example.strivo.feature.auth.AuthViewModel
+import com.example.strivo.feature.body.BodyViewModel
 import com.example.strivo.feature.coach.AdviceCard
 import com.example.strivo.feature.plans.ExerciseViewModel
 import com.example.strivo.feature.plans.ExtraExerciseSheet
@@ -85,6 +86,7 @@ fun HomeScreen(
     onStartWorkout: (Plan) -> Unit,
     onAddExercise: (planId: Long) -> Unit,
     onOpenLibrary: () -> Unit = {},
+    onOpenBody: () -> Unit = {},
     advice: List<Advice> = emptyList(),
     onOpenCoach: () -> Unit = {},
     acceptLabel: (Advice) -> String? = { null },
@@ -96,6 +98,10 @@ fun HomeScreen(
 
     val auth by authViewModel.state.collectAsStateWithLifecycle()
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
+    // Today's muscles for the card that opens the 3D body (no model here: only the words).
+    val bodyViewModel: BodyViewModel = androidx.lifecycle.viewmodel.compose.viewModel(key = "home_body")
+    val todayBody by bodyViewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(plans) { bodyViewModel.load(withModel = false) } // again when the plans change
     val offers by planViewModel.offers.collectAsStateWithLifecycle()
     val notice by planViewModel.notice.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -219,6 +225,12 @@ fun HomeScreen(
                 Spacer(Modifier.height(16.dp))
                 TrainerOffersCard(offers = offers, onAccept = planViewModel::acceptOffer, onDecline = planViewModel::declineOffer)
             }
+        }
+
+        // Which muscles today works, and the way into the 3D body where they glow
+        item {
+            Spacer(Modifier.height(16.dp))
+            TodayBodyCard(state = todayBody, onOpen = onOpenBody)
         }
 
         // Week strip

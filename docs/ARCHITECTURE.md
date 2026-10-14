@@ -9,7 +9,7 @@ app/src/main/java/com/example/strivo/
 ├── MainActivity.kt, StrivoApp.kt     entry points; StrivoApp wires the data layer once per signed-in account
 ├── navigation/                       the nav graph, routes and the bottom bar; the only place that knows every screen
 ├── feature/                          one package per screen area: screens, view models and their parts
-│   ├── home/  workout/  plans/  analytics/  food/  history/  profile/  auth/  coach/
+│   ├── home/  workout/  plans/  analytics/  food/  history/  profile/  auth/  coach/  body/
 ├── core/                             shared by every feature, knows nothing about features or storage
 │   ├── ui/theme/                       colours, type, shapes (AppColors, AppType, AppShapes)
 │   ├── ui/components/                  buttons, cards, dialogs, pickers, top bar ...
@@ -47,7 +47,7 @@ navigation ──▶ feature ──▶ core ──▶ domain
 
 Inside `data`, storage and the network (`local`, `remote`) sit below `sync`, which sits below `repository`; nothing points
 back up. Between features only these links are allowed, because the screens really do open each other:
-`home → plans, profile, auth, coach`, `analytics → coach`, `history → plans`, `profile → auth`.
+`home → plans, profile, auth, coach, body`, `analytics → coach`, `history → plans`, `profile → auth`.
 
 ## How a screen works
 
@@ -141,7 +141,11 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
 - **3D body.** `models/anatomy` (built by `tools/anatomy` from BodyParts3D, the Human Reference Atlas and Z-Anatomy data) holds a male and a female
   model with one node per muscle group and side, a skeleton and a smooth see-through skin layer over them (the female skin has a soft bust contour; no breast is drawn), and `muscles.json`, the
   catalogue of 34 muscle groups. The dashboard's Body page (admins can give a muscle a subtitle and a description of their own, kept in `muscles/{muscleId}`, and change which library exercises train it) shows it
-  (three.js); the app will use the same files. A library exercise names the muscles it trains (`primaryMuscles`, `secondaryMuscles`: catalogue ids,
+  (three.js). The app draws the same files natively (`feature/body`, OpenGL ES 3.0, no web view): `domain/body` holds the pure parts (catalogue, glTF reader,
+  camera maths, which muscles a day trains) and `feature/body/gl` the renderer (muscles, see-through skin, pulsing glow, colour-ID picking). The model follows the account's
+  gender (`female` shows the female body, anything else the male), and the muscles the chosen day's plan trains glow (main muscles brighter than helpers; exercises are matched to the
+  library by name), so the body shows the customer's own training. The Body screen opens from Home's "Your body today" card; the admins' muscle notes are pulled into
+  `UserPrefs` during sync. In debug builds `BodyPreviewActivity` shows the screen with a made-up week (see its comment). A library exercise names the muscles it trains (`primaryMuscles`, `secondaryMuscles`: catalogue ids,
   in `library/{id}`, set in the dashboard; the starter library in `admin/seed/library.json` has them), which is how a clicked muscle lists its exercises.
 - **Emulator tests.** `tools/emulator-tests` runs the rules and the dashboard (in headless Chrome) against the Firebase
   emulators: `cd tools/emulator-tests && npm test`.

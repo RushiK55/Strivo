@@ -30,6 +30,7 @@ import com.example.strivo.domain.model.Plan
 import com.example.strivo.feature.analytics.AnalyticsScreen
 import com.example.strivo.feature.analytics.AnalyticsViewModel
 import com.example.strivo.feature.auth.AuthViewModel
+import com.example.strivo.feature.body.BodyScreen
 import com.example.strivo.feature.food.FoodScreen
 import com.example.strivo.feature.food.FoodViewModel
 import com.example.strivo.feature.history.HistoryDetailsScreen
@@ -100,11 +101,16 @@ internal fun StrivoNavGraph(
                 onStartWorkout = { plan -> plan.planId?.let { navController.navigate(Routes.workout(it)) } },
                 onAddExercise = { planId -> navController.navigate(Routes.saveExercise(planId)) },
                 onOpenLibrary = { navController.navigate(Routes.library()) },
+                onOpenBody = { navController.navigate(Routes.BODY) },
                 advice = coach.advice,
                 onOpenCoach = { navController.openTab(Routes.ANALYTICS) },
                 acceptLabel = coach::acceptLabel,
                 onAcceptAdvice = coachViewModel::acceptAdvice,
             )
+        }
+
+        composable(Routes.BODY) {
+            BodyScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.PROFILE) {

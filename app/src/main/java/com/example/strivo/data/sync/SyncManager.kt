@@ -11,6 +11,7 @@ import com.example.strivo.domain.activity.DayNutrition
 import com.example.strivo.domain.activity.clientStats
 import com.example.strivo.domain.activity.nutritionByDay
 import com.example.strivo.domain.model.LibraryExercise
+import com.example.strivo.domain.body.MuscleNotes
 import com.example.strivo.domain.plan.PlanAssignment
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
@@ -200,6 +201,7 @@ class SyncManager(
         }
         if (pullProfile()) applied = true
         if (pullLibrary()) applied = true
+        pullMuscleNotes()
         if (pullAssignedPlans()) applied = true
         if (applied) onCloudDataApplied()
     }
@@ -217,6 +219,23 @@ class SyncManager(
         throw e
     } catch (e: Exception) {
         false
+    }
+
+    /**
+     * What admins wrote about the muscles of the 3D body (the cloud's muscles/{id}: a subtitle, a description). Every user may read
+     * them; they are kept on the phone for the Body screen. Best effort: when they cannot be read (the rules not published yet,
+     * no admin has written any) what is on the phone stays.
+     */
+    private suspend fun pullMuscleNotes() {
+        try {
+            val snapshot = withTimeout(READ_TIMEOUT_MILLIS) { firestore.collection("muscles").get(Source.SERVER).await() }
+            val notes = snapshot.documents.mapNotNull { document -> MuscleNotes.fromMap(document.data ?: emptyMap())?.let { document.id to it } }.toMap()
+            prefs.setMuscleNotes(notes)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Keep what is there.
+        }
     }
 
     /**

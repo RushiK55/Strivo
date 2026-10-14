@@ -10,7 +10,7 @@ import com.example.strivo.domain.activity.withoutFoodName
  */
 internal object Schema {
     /** Bump when a table changes, and add a step for it to [upgrade]. */
-    const val VERSION = 17
+    const val VERSION = 18
 
     /** The tables demo data writes to, which carry the isDemo mark. */
     val DemoTables = listOf("workout_sessions", "exercises", "plans", "food_log", "activity_log", "weight_log")
@@ -40,7 +40,9 @@ internal object Schema {
           defaultWeightKg REAL NOT NULL,
           videoUrl TEXT NOT NULL,
           active INTEGER NOT NULL,
-          updatedAt INTEGER NOT NULL
+          updatedAt INTEGER NOT NULL,
+          primaryMuscles TEXT NOT NULL DEFAULT '',
+          secondaryMuscles TEXT NOT NULL DEFAULT ''
         )"""
 
     private const val CREATE_ACTIVITY_LOG = """
@@ -138,6 +140,15 @@ internal object Schema {
         if (oldVersion < 16) {
             db.execSQL(CREATE_ACTIVITY_EVENTS)
             db.execSQL(CREATE_LIBRARY)
+        }
+        // The library gained the muscles each exercise trains. A library made by version 16 or 17 has no such columns: add them
+        // and empty the table, so the starter library (which has the muscles) is loaded again on the next start and the cloud's is
+        // read again on the next sync. (An older one gets the new table above, which already has them.) Nothing of the user's is lost:
+        // the library is only a copy of what the admins publish.
+        if (oldVersion in 16..17) {
+            db.execSQL("ALTER TABLE library_exercises ADD COLUMN primaryMuscles TEXT NOT NULL DEFAULT ''")
+            db.execSQL("ALTER TABLE library_exercises ADD COLUMN secondaryMuscles TEXT NOT NULL DEFAULT ''")
+            db.execSQL("DELETE FROM library_exercises")
         }
         if (oldVersion < 12) {
             createSyncObjects(db)

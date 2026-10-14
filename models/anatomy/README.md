@@ -3,6 +3,9 @@
 The 3D body the app and the dashboard show: a skin layer over the muscles. Hover a muscle to light it up; click it and the skin
 fades away and the muscle glows (the rest step back); read what it does and see its exercises.
 
+The Android app packs this folder into its assets (`app/build.gradle.kts`) and draws it natively with OpenGL ES, not in a web view: the
+male or female body by the account's gender, with the muscles trained on the chosen day glowing. The credit is shown in the Body screen.
+
 | File | What it is |
 |---|---|
 | `male.glb`, `female.glb` | glTF 2.0 binary, about 3.6 MB each, 200,000 triangles (133,000 muscle, 30,000 skeleton, 40,000 skin). Plain glTF: no compression extension, so any viewer reads it |

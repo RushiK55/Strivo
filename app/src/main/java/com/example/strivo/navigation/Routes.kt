@@ -17,6 +17,7 @@ internal object Routes {
     const val EXERCISE_DETAILS = "exerciseDetails/{planId}/{exerciseId}"
     const val WORKOUT = "workout/{planId}"
     const val LIBRARY = "library?planId={planId}"
+    const val BODY = "body"
 
     fun historyDetails(sessionId: Long) = "historyDetails/$sessionId"
     fun pickPlan(day: String) = "pickPlan/$day"

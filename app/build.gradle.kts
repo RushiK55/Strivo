@@ -37,6 +37,8 @@ android {
     sourceSets {
         // The starter exercise library lives in admin/seed so the admin dashboard imports the very same file.
         getByName("main").assets.directories += "../admin/seed"
+        // The 3D body: the male and female models, the muscle catalogue and their credit (models/anatomy, built by tools/anatomy).
+        getByName("main").assets.directories += "../models/anatomy"
     }
 }
 
