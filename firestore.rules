@@ -9,7 +9,8 @@ rules_version = '2';
 //                          what was eaten) or the exercise history, and can never change anything of a client's,
 //                          except one thing:
 //   users/{uid}/assigned   plans a trainer SENDS to a client. An admin creates one (status "sent") and may withdraw it
-//                          until the app picks it up; the app adds it to the client's plans and marks it "delivered".
+//                          until the client has answered it. The app marks it "delivered" when it reaches the phone, and
+//                          then "accepted" (the plan goes onto the day the trainer chose) or "declined"; an answer is final.
 //                          Nobody else writes here, the client included, so what the trainer sees is what was sent.
 //   library/{exerciseId}   the exercise library: every signed-in user reads it, only admins change it
 //   admins/{uid}           who is an admin; only an admin changes it. The first admin is created by hand in the
@@ -79,13 +80,19 @@ service cloud.firestore {
 
       match /assigned/{assignmentId} {
         allow create: if isAdmin() && validAssignment();
-        // Withdrawn by a trainer while the app has not picked it up yet.
-        allow delete: if isAdmin() && resource.data.status == 'sent';
-        // The app marks it delivered once the plan is on the phone, and changes nothing else.
-        allow update: if isOwner(uid) && resource.data.status == 'sent'
-          && request.resource.data.status == 'delivered'
-          && request.resource.data.deliveredAt is int
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt']);
+        // Withdrawn by a trainer until the client has answered it.
+        allow delete: if isAdmin() && resource.data.status in ['sent', 'delivered'];
+        // The app says it arrived ("delivered"), and then how the client answered ("accepted" or "declined"). It changes nothing
+        // else, and once answered the plan is closed.
+        allow update: if isOwner(uid) && resource.data.status in ['sent', 'delivered'] && (
+          (resource.data.status == 'sent'
+            && request.resource.data.status == 'delivered'
+            && request.resource.data.deliveredAt is int
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt']))
+          || (request.resource.data.status in ['accepted', 'declined']
+            && request.resource.data.answeredAt is int
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'answeredAt', 'deliveredAt']))
+        );
       }
     }
 

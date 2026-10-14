@@ -12,7 +12,7 @@ straight to the same Firebase project as the app, so there is no server to run.
 | **Overview** | Clients, who trained in the last 7 days, workouts per day, **who needs a nudge**, latest workouts, most workouts |
 | **Clients** | Every client: training status (on track, slipping, missing), last workout, this week against their plan, body weight and its change, average calories and protein. Filter, sort (needs a nudge first), search, page |
 | **Attendance** | Every client's last 14 days as a row of squares, this week against the plan, last workout. Filter by missed this week, below plan, met the plan |
-| **A client** | Attendance (12 weeks and a calendar), **strength** (the heaviest set of every exercise, workout by workout, with the change since the first), body weight, **daily calories and protein**, finished workouts with every set, activity, their plans, and **Send a plan** (pick a day, start from one of their plans or the library, add a note) |
+| **A client** | Attendance (12 weeks and a calendar), **strength** (the heaviest set of every exercise, workout by workout, with the change since the first), body weight, **daily calories and protein**, finished workouts with every set, activity, their plans, and **Send a plan** (pick a day, start from one of their plans or the library, add a note; send one per day for a week, and the client's app shows them as one offer to accept or decline) |
 | **Activity** | What all clients added or changed, newest first |
 | **Body** | A 3D body (male or female) filling the whole page, in the middle, with a see-through **skin layer over the muscles**; turn and zoom it freely. Hover a muscle to light it up, **click it and the skin fades away**, the muscle glows, the rest step back, and a **box floats beside the body, joined to the muscle by a line**, saying what it does with a **Show exercises** button for the library exercises that train it (Esc or the X closes it). The controls are behind the **three-line button in the top right corner**: a **Muscles** button that opens the list of every muscle (the way to reach one with the keyboard), male/female, front/back/reset, and switches for the skin, Fade surface (shows the deep muscles) and the skeleton. The credits the models need (CC BY-SA 4.0) are behind the small **Credits** button in the bottom right corner |
 | **Library** | Add, edit, hide and delete library exercises, and set the **main and helping muscles** each one trains (what the Body page lists); import the starter library, and **fill in muscles** on exercises that predate the muscle fields |
@@ -29,8 +29,10 @@ straight to the same Firebase project as the app, so there is no server to run.
 
 A trainer **reads** client data but cannot change it (the rules enforce this, not just the page). The only things a
 trainer writes are library exercises, the team list, and **plans sent to a client** (`users/{uid}/assigned`). A sent plan
-is not the client's plan itself: the client's app adds it to their plans (on the day picked) the next time it syncs, and
-marks it delivered. Until then the trainer can withdraw it; after that it belongs to the client, who can change or delete it.
+is not the client's plan itself: it reaches their app the next time it syncs as an **offer** (a week's plans sent together are one
+offer, with **Accept** and **Decline**). Accepting puts each plan on the day the trainer picked; declining adds nothing. The trainer
+sees on the client's Plans tab whether it is waiting, accepted or declined, and can withdraw it until it is answered; after that it
+belongs to the client, who can change or delete it.
 
 ## One-time setup
 
@@ -117,8 +119,9 @@ account id in advance.
 - **Library**: `library/{exerciseId}`. The app copies it to the phone and shows only exercises that are *shown*.
 - **Sent plans**: `users/{uid}/assigned/{id}`: the plan name, day (a weekday, or `Prebuilt` for the client's plan
   library), a note, the trainer's name, up to 30 exercises (name, sets, reps, weightKg, dropSets, notes), and a status:
-  `sent` until the app picks it up, then `delivered` with `deliveredAt`. Only a trainer creates or withdraws one; only
-  the client's app marks it delivered (`firestore.rules`). A client needs an app version that knows about sent plans.
+  `sent` until it reaches the phone, then `delivered` (with `deliveredAt`) while it waits for the client's answer, then
+  `accepted` or `declined` (with `answeredAt`), which is final. Only a trainer creates or withdraws one (until it is answered);
+  only the client's app changes its status (`firestore.rules`). A client needs an app version that knows about sent plans.
 - **Security**: `firestore.rules` at the project root. Text from clients is only ever displayed as text (nothing in the
   dashboard uses `dangerouslySetInnerHTML`), and the hosting headers (`firebase.json`) set a content security policy
   that only allows scripts from this site. Next's static export starts the page with small inline scripts, so the policy

@@ -1,5 +1,6 @@
 package com.example.strivo.feature.home
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -95,7 +96,13 @@ fun HomeScreen(
 
     val auth by authViewModel.state.collectAsStateWithLifecycle()
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
-    val fromTrainer by planViewModel.received.collectAsStateWithLifecycle()
+    val offers by planViewModel.offers.collectAsStateWithLifecycle()
+    val notice by planViewModel.notice.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // What accepting did ("Added 7 plans to your week"), said once.
+    LaunchedEffect(notice) {
+        notice?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); planViewModel.clearNotice() }
+    }
     val groupedPlans = remember(plans) { plans.groupedByDay() }
     val plansForDay = groupedPlans[selectedDay].orEmpty()
 
@@ -206,19 +213,11 @@ fun HomeScreen(
             }
         }
 
-        // Plans the trainer just sent
-        if (fromTrainer.isNotEmpty()) {
+        // Plans the trainer sent that are waiting for an answer: one card for a week's worth, with Accept and Decline
+        if (offers.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(16.dp))
-                TrainerPlansCard(
-                    plans = fromTrainer,
-                    onOpen = { received ->
-                        // The user may have deleted it since; then there is nothing to open and the note goes.
-                        val plan = plans.firstOrNull { it.planId == received.planId }
-                        if (plan != null) onOpenPlan(plan) else planViewModel.dismissReceived(received.id)
-                    },
-                    onDismiss = { planViewModel.dismissReceived(it.id) },
-                )
+                TrainerOffersCard(offers = offers, onAccept = planViewModel::acceptOffer, onDecline = planViewModel::declineOffer)
             }
         }
 

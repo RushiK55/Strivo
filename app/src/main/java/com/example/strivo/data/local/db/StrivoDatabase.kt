@@ -340,14 +340,14 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
         }
     }
 
-    /** Adds a plan with its exercises (in this order) and the line for the activity log, all or nothing. Returns the plan's id. */
-    fun importPlan(plan: Plan, exercises: List<Exercise>, event: ActivityEvent): Long {
+    /** Adds a plan with its exercises (in this order) and, when there is one, the line for the activity log, all or nothing. Returns the plan's id. */
+    fun importPlan(plan: Plan, exercises: List<Exercise>, event: ActivityEvent?): Long {
         val db = writableDatabase
         db.beginTransaction()
         try {
             val planId = createPlan(plan)
             exercises.forEachIndexed { position, exercise -> createExercise(exercise.copy(id = null, planId = planId, sortOrder = position)) }
-            insertEvent(event)
+            if (event != null) insertEvent(event)
             db.setTransactionSuccessful()
             return planId
         } finally {

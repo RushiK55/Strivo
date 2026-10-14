@@ -10,11 +10,8 @@ import com.example.strivo.domain.activity.ClientStats
 import com.example.strivo.domain.activity.DayNutrition
 import com.example.strivo.domain.activity.clientStats
 import com.example.strivo.domain.activity.nutritionByDay
-import com.example.strivo.domain.activity.planAssigned
 import com.example.strivo.domain.model.LibraryExercise
-import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.plan.PlanAssignment
-import com.example.strivo.domain.plan.ReceivedPlan
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
@@ -169,6 +166,7 @@ class SyncManager(
                 db.clearChanges(logIds)
             }
         }
+        sendPlanAnswers()
         if (prefs.profileNeedsUpload()) {
             prefs.exportProfile()?.let { profile ->
                 withTimeout(WRITE_TIMEOUT_MILLIS) { userDoc().collection("meta").document("profile").set(profile).await() }
@@ -222,34 +220,77 @@ class SyncManager(
     }
 
     /**
-     * Plans a trainer sent from the dashboard (users/{uid}/assigned, status "sent"). Each is added to this phone's plans
-     * once (the ids already added are remembered on the phone), then marked delivered in the cloud so the trainer sees it
-     * arrived. Adding comes first: if marking fails, the next sync only retries the mark. Best effort, like the library.
+     * Plans a trainer sent from the dashboard (users/{uid}/assigned) that the user has not answered yet (status "sent" or
+     * "delivered"). They are NOT added to the user's plans: they are kept as offers for the Home screen to ask about (see
+     * StrivoRepository.planOffers), and one that arrived is marked "delivered" so the trainer sees it reached the phone. A plan
+     * the user already answered here is not offered again; if the cloud still shows it as waiting, the answer is queued again.
+     * Best effort, like the library. Returns whether the offers changed.
      */
     private suspend fun pullAssignedPlans(): Boolean = try {
         val snapshot = withTimeout(READ_TIMEOUT_MILLIS) {
-            userDoc().collection("assigned").whereEqualTo("status", PlanAssignment.STATUS_SENT).get(Source.SERVER).await()
+            userDoc().collection("assigned")
+                .whereIn("status", listOf(PlanAssignment.STATUS_SENT, PlanAssignment.STATUS_DELIVERED))
+                .get(Source.SERVER).await()
         }
-        val received = prefs.getReceivedPlans().map { it.id }.toSet()
-        var added = false
+        val accepted = prefs.getReceivedPlans().map { it.id }.toSet()
+        val declined = prefs.getDeclinedPlanIds()
+        val queued = prefs.getPendingAnswers()
+        val waiting = mutableListOf<PlanAssignment>()
+        var requeued = false
         snapshot.documents.forEach { document ->
             val assignment = PlanAssignment.fromMap(document.id, document.data ?: emptyMap()) ?: return@forEach
-            val now = System.currentTimeMillis()
-            if (assignment.id !in received) {
-                val planId = db.importPlan(Plan(planName = assignment.planName, planDay = assignment.day), assignment.exercises, planAssigned(assignment, now))
-                prefs.addReceivedPlan(ReceivedPlan.from(assignment, planId, now))
-                added = true
+            val answer = when (assignment.id) {
+                in accepted -> PlanAssignment.STATUS_ACCEPTED
+                in declined -> PlanAssignment.STATUS_DECLINED
+                else -> null
             }
-            withTimeout(WRITE_TIMEOUT_MILLIS) {
-                document.reference.update(mapOf("status" to PlanAssignment.STATUS_DELIVERED, "deliveredAt" to now)).await()
+            if (answer != null) {
+                if (assignment.id !in queued) { prefs.addPendingAnswers(mapOf(assignment.id to answer)); requeued = true }
+                return@forEach
             }
+            waiting += assignment
+            if (document.getString("status") == PlanAssignment.STATUS_SENT) markDelivered(document.reference)
         }
-        if (added) wake.trySend(false) // upload the new plan
-        added
+        if (requeued) wake.trySend(false)
+        val before = prefs.getOffers().map { it.id }.toSet()
+        prefs.setOffers(waiting)
+        waiting.map { it.id }.toSet() != before
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         false
+    }
+
+    /** Tells the trainer a plan reached the phone. Best effort: the answer, later, says it all. */
+    private suspend fun markDelivered(reference: DocumentReference) {
+        try {
+            withTimeout(WRITE_TIMEOUT_MILLIS) {
+                reference.update(mapOf("status" to PlanAssignment.STATUS_DELIVERED, "deliveredAt" to System.currentTimeMillis())).await()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // The next sync tries again.
+        }
+    }
+
+    /**
+     * Tells the cloud how the user answered each plan ("accepted" or "declined"), so the trainer sees it. A plan the trainer
+     * has withdrawn meanwhile is simply forgotten; any other failure leaves the answer queued for the next sync.
+     */
+    private suspend fun sendPlanAnswers() {
+        prefs.getPendingAnswers().forEach { (id, answer) ->
+            try {
+                withTimeout(WRITE_TIMEOUT_MILLIS) {
+                    userDoc().collection("assigned").document(id).update(mapOf("status" to answer, "answeredAt" to System.currentTimeMillis())).await()
+                }
+                prefs.clearPendingAnswer(id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if ((e as? FirebaseFirestoreException)?.code == FirebaseFirestoreException.Code.NOT_FOUND) prefs.clearPendingAnswer(id)
+            }
+        }
     }
 
     /**

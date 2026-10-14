@@ -7,7 +7,7 @@ import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.isWork
-import com.example.strivo.domain.plan.PlanAssignment
+import com.example.strivo.domain.plan.PlanOffer
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -53,15 +53,16 @@ fun planDeleted(plan: Plan, at: Long) =
 fun planCopied(source: Plan, day: String, at: Long) =
     ActivityEvent(at = at, type = ActivityKind.PlanCopied, summary = "Added plan \"${source.planName}\" to $day")
 
-/** "Got plan "Push Day" (Monday) from Coach Raj · 5 exercises" */
-fun planAssigned(assignment: PlanAssignment, at: Long): ActivityEvent {
-    val from = assignment.trainerName.ifEmpty { "their trainer" }
-    val count = assignment.exercises.size
-    return ActivityEvent(
-        at = at,
-        type = ActivityKind.PlanAssigned,
-        summary = "Got plan ${planLabel("\"${assignment.planName}\"", assignment.day)} from $from · ${if (count == 1) "1 exercise" else "$count exercises"}",
-    )
+/**
+ * What the user answered to a plan offer: "Accepted plan "Push Day" (Monday) from Coach Raj" or
+ * "Declined 7 plans from Coach Raj (Mon to Sun)". One line for the whole offer, however many plans were in it.
+ */
+fun planOfferAnswered(offer: PlanOffer, accepted: Boolean, at: Long): ActivityEvent {
+    val from = offer.trainerName.ifEmpty { "their trainer" }
+    val verb = if (accepted) "Accepted" else "Declined"
+    val what = if (offer.plans.size == 1) "plan " + planLabel("\"" + offer.plans.single().planName + "\"", offer.plans.single().day) else "${offer.plans.size} plans"
+    val days = if (offer.plans.size == 1) "" else " (${offer.where})"
+    return ActivityEvent(at = at, type = ActivityKind.PlanAssigned, summary = "$verb $what from $from$days")
 }
 
 private fun target(exercise: Exercise): String {

@@ -72,20 +72,20 @@ export function ClientPlansTab({ uid }: { uid: string }) {
     }
     rememberName(value.sentByName);
     setOpen(false);
-    toast(`Sent "${value.planName}". It appears in their app the next time it syncs.`);
+    toast(`Sent "${value.planName}". It reaches their app the next time it syncs, and they choose whether to accept it.`);
     sent.reload();
     return undefined;
   }
 
   async function withdraw(assignment: Assignment) {
-    const ok = await confirm({ title: 'Withdraw this plan?', message: `"${assignment.planName}" will not be added to their app.`, confirmText: 'Withdraw' });
+    const ok = await confirm({ title: 'Withdraw this plan?', message: `"${assignment.planName}" will be taken back and never offered to them (or will disappear from their offer).`, confirmText: 'Withdraw' });
     if (!ok) return;
     try {
       await withdrawAssignment(uid, assignment.id);
       toast('Withdrawn.');
     } catch {
-      // Most likely the app picked it up a moment ago: it is the client's plan now.
-      toast('Could not withdraw it. It may have reached their app already.', 'error');
+      // Most likely the client answered it a moment ago: an answered plan stays.
+      toast('Could not withdraw it. They may have answered it already.', 'error');
     }
     sent.reload();
   }
@@ -95,7 +95,7 @@ export function ClientPlansTab({ uid }: { uid: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Plans you sent</CardTitle>
-          <CardDescription>A plan you send is added to the client&apos;s app, on the day you pick, the next time the app syncs.</CardDescription>
+          <CardDescription>A plan you send reaches the client&apos;s app the next time it syncs. They accept or decline it there; accepting puts it on the day you pick. Plans you send close together (a week&apos;s worth) are one offer to them.</CardDescription>
           <CardAction>
             <Button onClick={() => void openForm()}><Send /> Send a plan</Button>
           </CardAction>
@@ -139,9 +139,7 @@ function SentList({ sent, error, onWithdraw }: { sent: Assignment[] | undefined;
             <div className="flex flex-wrap items-center gap-2">
               <strong>{assignment.planName}</strong>
               <ToneBadge tone="info">{dayLabel(assignment.day)}</ToneBadge>
-              {assignment.status === 'delivered'
-                ? <ToneBadge tone="good">{`In their app · ${relativeTime(assignment.deliveredAt)}`}</ToneBadge>
-                : <ToneBadge tone="warn">Waiting for their app</ToneBadge>}
+              <StatusBadge assignment={assignment} />
             </div>
             <p className="text-sm text-muted-foreground">
               {`${assignment.exercises?.length ?? 0} exercises · sent ${relativeTime(assignment.sentAt)}${assignment.sentByName ? ` by ${assignment.sentByName}` : ''}`}
@@ -151,13 +149,23 @@ function SentList({ sent, error, onWithdraw }: { sent: Assignment[] | undefined;
             ) : null}
             {assignment.note ? <p className="text-sm text-muted-foreground">{`Note: ${assignment.note}`}</p> : null}
           </div>
-          {assignment.status === 'sent' ? (
+          {assignment.status === 'sent' || assignment.status === 'delivered' ? (
             <Button variant="outline" size="sm" onClick={() => onWithdraw(assignment)}><Undo2 /> Withdraw</Button>
           ) : null}
         </li>
       ))}
     </ul>
   );
+}
+
+/** Where a plan you sent has got to: not on their phone yet, on it and waiting for an answer, accepted (it is in their plans) or declined. */
+function StatusBadge({ assignment }: { assignment: Assignment }) {
+  switch (assignment.status) {
+    case 'accepted': return <ToneBadge tone="good">{`Accepted · ${relativeTime(assignment.answeredAt)}`}</ToneBadge>;
+    case 'declined': return <ToneBadge tone="bad">{`Declined · ${relativeTime(assignment.answeredAt)}`}</ToneBadge>;
+    case 'delivered': return <ToneBadge tone="info">{`On their phone, waiting for an answer · ${relativeTime(assignment.deliveredAt)}`}</ToneBadge>;
+    default: return <ToneBadge tone="warn">Waiting for their app</ToneBadge>;
+  }
 }
 
 function PlanCards({ plans }: { plans: ClientPlan[] }) {

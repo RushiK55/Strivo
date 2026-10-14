@@ -430,12 +430,21 @@ test('the trainer sends a client a plan, sees it reach the app, and can withdraw
   assert.equal(plan.day, 'Thursday');
   assert.ok(plan.exercises.length >= 1 && plan.exercises.every((e) => Number.isInteger(e.sets) && typeof e.weightKg === 'number'));
 
-  // The client's app picks it up and marks it delivered (as the client, so the rules are checked too).
-  await updateDoc(doc(testEnv.authenticatedContext(users.alice).firestore(), `users/${users.alice}/assigned/${sent[0].id}`), { status: 'delivered', deliveredAt: Date.now() });
+  // The client's app picks it up and marks it delivered (as the client, so the rules are checked too): it is on their phone,
+  // waiting for them to accept it, so the trainer can still take it back.
+  const alice = testEnv.authenticatedContext(users.alice).firestore();
+  const assigned = doc(alice, `users/${users.alice}/assigned/${sent[0].id}`);
+  await updateDoc(assigned, { status: 'delivered', deliveredAt: Date.now() });
   await clickText('button[role="tab"]', 'Overview');
   await clickText('button[role="tab"]', 'Plans');
-  await waitForText('In their app');
-  assert.ok(!(await text()).includes('Withdraw'), 'a delivered plan cannot be withdrawn');
+  await waitForText('waiting for an answer');
+  assert.ok((await text()).includes('Withdraw'), 'a plan the client has not answered can still be withdrawn');
+  // The client accepts it: the trainer sees that, and it can no longer be withdrawn.
+  await updateDoc(assigned, { status: 'accepted', answeredAt: Date.now() });
+  await clickText('button[role="tab"]', 'Overview');
+  await clickText('button[role="tab"]', 'Plans');
+  await waitForText('Accepted ·');
+  assert.ok(!(await text()).includes('Withdraw'), 'an accepted plan cannot be withdrawn');
 
   // A second plan, withdrawn before the app saw it.
   await clickText('button', 'Send a plan');
@@ -449,6 +458,22 @@ test('the trainer sends a client a plan, sees it reach the app, and can withdraw
   await clickText('[role="alertdialog"] button', 'Withdraw');
   await waitForGone('Mistake');
   await waitForNoDialog();
+  // A third the client declines: the trainer sees that too.
+  await clickText('button', 'Send a plan');
+  await page.waitForSelector('[role="dialog"] input[name="planName"]');
+  await page.type('input[name="planName"]', 'Not for me');
+  await page.type('input[aria-label="Exercise 1 name"]', 'Row');
+  await clickText('[role="dialog"] button', 'Send plan');
+  await waitForNoDialog();
+  await waitForText('Not for me');
+  let declinedId;
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    declinedId = (await getDocs(collection(ctx.firestore(), `users/${users.alice}/assigned`))).docs.find((d) => d.data().planName === 'Not for me').id;
+  });
+  await updateDoc(doc(alice, `users/${users.alice}/assigned/${declinedId}`), { status: 'declined', answeredAt: Date.now() });
+  await clickText('button[role="tab"]', 'Overview');
+  await clickText('button[role="tab"]', 'Plans');
+  await waitForText('Declined ·');
   await shot('client-plans');
 });
 

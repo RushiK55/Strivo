@@ -182,15 +182,17 @@ export interface AssignmentFields {
 }
 
 /**
- * users/{uid}/assigned/{id}: a plan a trainer sent. 'sent' until the client's app adds it to their plans and marks it
- * 'delivered'. Only the trainer writes it (and may withdraw it while it is 'sent'); only the app marks it delivered.
+ * users/{uid}/assigned/{id}: a plan a trainer sent. 'sent' until it reaches the client's phone ('delivered'), where the client
+ * accepts it (it goes into their plans, on the day the trainer chose: 'accepted') or declines it ('declined'). Only the trainer
+ * writes it (and may withdraw it until it is answered); only the app changes its status, and an answer is final.
  */
 export interface Assignment extends AssignmentFields {
   id: string;
-  status: 'sent' | 'delivered';
+  status: 'sent' | 'delivered' | 'accepted' | 'declined';
   sentAt: number;
   sentBy: string;
   deliveredAt?: number;
+  answeredAt?: number;
 }
 
 /** admins/{uid} */

@@ -15,6 +15,7 @@ import com.example.strivo.domain.activity.foodLogged
 import com.example.strivo.domain.activity.planCopied
 import com.example.strivo.domain.activity.planCreated
 import com.example.strivo.domain.activity.planDeleted
+import com.example.strivo.domain.activity.planOfferAnswered
 import com.example.strivo.domain.activity.profileUpdated
 import com.example.strivo.domain.activity.weightLogged
 import com.example.strivo.domain.activity.workoutFinished
@@ -29,8 +30,10 @@ import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
+import com.example.strivo.domain.plan.PlanAssignment
+import com.example.strivo.domain.plan.PlanOffer
 import com.example.strivo.domain.plan.ReceivedPlan
-import com.example.strivo.domain.plan.toShow
+import com.example.strivo.domain.plan.groupOffers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -97,10 +100,41 @@ class StrivoRepository(
         newId
     }
 
-    /** Plans the trainer sent that the Home screen should mention: recent ones the user has not dismissed. */
-    suspend fun receivedPlans(): List<ReceivedPlan> = io { prefs.getReceivedPlans().toShow(now()) }
+    /**
+     * What the trainer is offering that the user has not answered, grouped so that a week's plans sent together are one offer.
+     * The user's own answers count at once, before the cloud has been told, so an answered plan never comes back.
+     */
+    suspend fun planOffers(): List<PlanOffer> = io {
+        val answered = prefs.getReceivedPlans().map { it.id }.toSet() + prefs.getDeclinedPlanIds()
+        groupOffers(prefs.getOffers().filter { it.id !in answered })
+    }
 
-    suspend fun dismissReceivedPlan(id: String) = io { prefs.dismissReceivedPlan(id) }
+    /**
+     * The user accepted: every plan of the offer is added to their plans, on the day the trainer chose, and the cloud is told
+     * on the next sync. A plan already added is not added again (a double tap, a retry). Returns how many plans were added.
+     */
+    suspend fun acceptOffer(offer: PlanOffer): Int = io {
+        val received = prefs.getReceivedPlans().map { it.id }.toSet()
+        val fresh = offer.plans.filter { it.id !in received }
+        if (fresh.isEmpty()) return@io 0
+        fresh.forEach { assignment ->
+            val planId = db.importPlan(Plan(planName = assignment.planName, planDay = assignment.day), assignment.exercises, null)
+            prefs.addReceivedPlan(ReceivedPlan.from(assignment, planId, now()))
+        }
+        prefs.addPendingAnswers(fresh.associate { it.id to PlanAssignment.STATUS_ACCEPTED })
+        record(planOfferAnswered(PlanOffer(fresh), accepted = true, at = now()))
+        fresh.size
+    }
+
+    /** The user said no: nothing is added, the plans never come back, and the cloud is told on the next sync. */
+    suspend fun declineOffer(offer: PlanOffer) = io {
+        val answered = prefs.getReceivedPlans().map { it.id }.toSet() + prefs.getDeclinedPlanIds()
+        val fresh = offer.plans.filter { it.id !in answered }
+        if (fresh.isEmpty()) return@io
+        prefs.addDeclinedPlans(fresh.map { it.id })
+        prefs.addPendingAnswers(fresh.associate { it.id to PlanAssignment.STATUS_DECLINED })
+        record(planOfferAnswered(PlanOffer(fresh), accepted = false, at = now()))
+    }
 
     // --- Exercises ---
 

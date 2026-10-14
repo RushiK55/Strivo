@@ -207,7 +207,7 @@ test('a trainer sends a plan to a client, and only a plan of the right shape', a
   await assertFails(setDoc(doc(as('bob'), 'users/alice/assigned/a8'), sentPlan({ sentBy: 'bob' })));
 });
 
-test('the client reads a sent plan and can only mark it delivered', async () => {
+test('the client reads a sent plan, marks it delivered and then answers it', async () => {
   await assertSucceeds(setDoc(doc(as('adminUid'), 'users/alice/assigned/a1'), sentPlan()));
   const db = as('alice');
   await assertSucceeds(getDocs(query(collection(db, 'users/alice/assigned'))));
@@ -215,19 +215,45 @@ test('the client reads a sent plan and can only mark it delivered', async () => 
   await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'delivered', deliveredAt: 5, planName: 'Changed' }));
   await assertFails(setDoc(doc(db, 'users/alice/assigned/mine'), sentPlan({ sentBy: 'alice' })));
   await assertFails(deleteDoc(doc(db, 'users/alice/assigned/a1')));
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'delivered' })); // needs the time it arrived
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'finished', answeredAt: 5 })); // only these answers
   await assertSucceeds(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'delivered', deliveredAt: 5 }));
-  // Another user sees nothing of it.
+  // Another user sees nothing of it, and cannot answer for her.
   await assertFails(getDoc(doc(as('bob'), 'users/alice/assigned/a1')));
+  await assertFails(updateDoc(doc(as('bob'), 'users/alice/assigned/a1'), { status: 'accepted', answeredAt: 6 }));
+  // An answer needs the time of it, and changes nothing but the status.
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'accepted' }));
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'accepted', answeredAt: 6, planName: 'Changed' }));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'accepted', answeredAt: 6 }));
+  // An answer is final: it cannot be taken back or changed, and the plan can no longer be withdrawn.
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'declined', answeredAt: 7 }));
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'sent' }));
+  await assertFails(deleteDoc(doc(as('adminUid'), 'users/alice/assigned/a1')));
 });
 
-test('a trainer can withdraw a plan until the app has picked it up', async () => {
+test('the client can answer a plan straight away, and decline it', async () => {
+  const db = as('alice');
+  await assertSucceeds(setDoc(doc(as('adminUid'), 'users/alice/assigned/a1'), sentPlan()));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'declined', answeredAt: 5 })); // never marked delivered
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a1'), { status: 'accepted', answeredAt: 6 }));
+  await assertSucceeds(setDoc(doc(as('adminUid'), 'users/alice/assigned/a2'), sentPlan()));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice/assigned/a2'), { status: 'delivered', deliveredAt: 5 }));
+  await assertSucceeds(updateDoc(doc(db, 'users/alice/assigned/a2'), { status: 'declined', answeredAt: 6, deliveredAt: 5 }));
+});
+
+test('a trainer can withdraw a plan until the client has answered it', async () => {
   const db = as('adminUid');
   await assertSucceeds(setDoc(doc(db, 'users/alice/assigned/a1'), sentPlan()));
   await assertSucceeds(deleteDoc(doc(db, 'users/alice/assigned/a1')));
+  // on the phone but not answered yet: still the trainer's to take back
   await assertSucceeds(setDoc(doc(db, 'users/alice/assigned/a2'), sentPlan()));
   await assertSucceeds(updateDoc(doc(as('alice'), 'users/alice/assigned/a2'), { status: 'delivered', deliveredAt: 5 }));
-  await assertFails(deleteDoc(doc(db, 'users/alice/assigned/a2')));
-  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a2'), { status: 'sent' }));
+  await assertFails(updateDoc(doc(db, 'users/alice/assigned/a2'), { status: 'sent' })); // a trainer cannot change it, only withdraw it
+  await assertSucceeds(deleteDoc(doc(db, 'users/alice/assigned/a2')));
+  // answered: it stays
+  await assertSucceeds(setDoc(doc(db, 'users/alice/assigned/a3'), sentPlan()));
+  await assertSucceeds(updateDoc(doc(as('alice'), 'users/alice/assigned/a3'), { status: 'accepted', answeredAt: 6 }));
+  await assertFails(deleteDoc(doc(db, 'users/alice/assigned/a3')));
 });
 
 test('everything not listed is denied, even to an admin', async () => {

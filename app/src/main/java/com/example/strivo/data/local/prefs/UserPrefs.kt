@@ -3,6 +3,7 @@ package com.example.strivo.data.local.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.strivo.core.util.todayIso
+import com.example.strivo.domain.plan.PlanAssignment
 import com.example.strivo.domain.plan.ReceivedPlan
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -199,17 +200,46 @@ class UserPrefs(context: Context, uid: String) {
     }
 
     // --- Plans from the trainer ---
+    // A plan the trainer sends is an offer until the user answers it: accepted (it is added to their plans and remembered here, so
+    // it is never added twice) or declined (remembered here, so it never comes back). The cloud is told the answer afterwards.
 
-    /** Every plan a trainer sent that was added to this phone, so none is added twice. */
+    /** Every plan the user accepted that was added to this phone. */
     fun getReceivedPlans(): List<ReceivedPlan> = ReceivedPlan.listFromJson(prefs.getString(KEY_RECEIVED_PLANS, null))
 
     fun addReceivedPlan(plan: ReceivedPlan) = saveReceivedPlans(getReceivedPlans().filter { it.id != plan.id } + plan)
 
-    fun dismissReceivedPlan(id: String) = saveReceivedPlans(getReceivedPlans().map { if (it.id == id) it.copy(dismissed = true) else it })
-
     private fun saveReceivedPlans(plans: List<ReceivedPlan>) {
         // commit, not apply: this list is what stops a plan from being added twice if the app closes right after.
         prefs.edit().putString(KEY_RECEIVED_PLANS, ReceivedPlan.listToJson(plans)).commit()
+    }
+
+    /** The plans the trainer is offering that the user has not answered, as last read from the cloud (so they show offline too). */
+    fun getOffers(): List<PlanAssignment> = PlanAssignment.listFromJson(prefs.getString(KEY_PLAN_OFFERS, null))
+
+    fun setOffers(offers: List<PlanAssignment>) {
+        prefs.edit().putString(KEY_PLAN_OFFERS, PlanAssignment.listToJson(offers)).apply()
+    }
+
+    /** The ids of the plans the user declined. */
+    fun getDeclinedPlanIds(): Set<String> = prefs.getStringSet(KEY_DECLINED_PLANS, emptySet()).orEmpty()
+
+    fun addDeclinedPlans(ids: Collection<String>) {
+        prefs.edit().putStringSet(KEY_DECLINED_PLANS, getDeclinedPlanIds() + ids).commit()
+    }
+
+    /** Answers the cloud has not been told yet: plan id to "accepted" or "declined". */
+    fun getPendingAnswers(): Map<String, String> = prefs.getStringSet(KEY_PENDING_ANSWERS, emptySet()).orEmpty()
+        .mapNotNull { entry -> entry.substringBefore('|', "").takeIf { it.isNotEmpty() }?.let { it to entry.substringAfter('|') } }
+        .toMap()
+
+    fun addPendingAnswers(answers: Map<String, String>) {
+        val kept = getPendingAnswers() + answers
+        prefs.edit().putStringSet(KEY_PENDING_ANSWERS, kept.map { (id, answer) -> "$id|$answer" }.toSet()).commit()
+    }
+
+    fun clearPendingAnswer(id: String) {
+        val kept = getPendingAnswers() - id
+        prefs.edit().putStringSet(KEY_PENDING_ANSWERS, kept.map { (key, answer) -> "$key|$answer" }.toSet()).commit()
     }
 
     // --- Daily reset ---
@@ -250,6 +280,9 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_DEMO_WEIGHTS = "demo_weight_dates"
         private const val KEY_FINISHED_PLANS = "finished_plans"
         private const val KEY_RECEIVED_PLANS = "received_plans"
+        private const val KEY_PLAN_OFFERS = "plan_offers"
+        private const val KEY_DECLINED_PLANS = "declined_plans"
+        private const val KEY_PENDING_ANSWERS = "plan_answers"
         private const val MARKER = -1L // stands for the plan itself in a finished-plans entry
     }
 }

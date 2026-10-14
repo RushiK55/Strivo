@@ -118,12 +118,16 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
 - **Daily intake.** The same publish writes one document per day to `users/{uid}/nutrition/{date}` (calories, protein,
   carbs, fat, number of meals) for the last 90 days; only days that changed are written. This is the only thing from the
   food log that reaches the trainer.
-- **Plans from the trainer.** A trainer sends a plan from the dashboard to `users/{uid}/assigned/{id}` (status `sent`).
-  `SyncManager.pullAssignedPlans` reads them on each pull, adds each one to the local plans once (`StrivoDatabase.importPlan`,
-  with a `plan_assigned` line in the activity log), remembers its id (`UserPrefs`), then marks it `delivered`. The pure part
-  (reading and clamping the document, the received list) is `domain/plan/PlanAssignment.kt`. Home shows a "From your
-  trainer" card (`feature/home/TrainerPlansCard.kt`) for the plans received in the last two weeks until the user hides it.
-  The added plan is an ordinary plan from then on: the user can change or delete it.
+- **Plans from the trainer.** A trainer sends a plan from the dashboard to `users/{uid}/assigned/{id}` (status `sent`), one per
+  day, so a week is seven of them. They are **offers, not plans**: `SyncManager.pullAssignedPlans` reads the ones still waiting
+  (`sent` or `delivered`) on each pull, keeps them in `UserPrefs` and marks each `delivered` (it reached the phone). Plans from
+  one trainer sent within an hour of each other are grouped (`groupOffers`, `domain/plan/PlanAssignment.kt`), so Home shows ONE
+  "From your trainer" card for a week (`feature/home/TrainerOffersCard.kt`): "Coach sent you 7 plans, Mon to Sun", with
+  **Accept** and **Decline**. Accept (`StrivoRepository.acceptOffer`) adds every plan to the day the trainer chose
+  (`StrivoDatabase.importPlan`) and remembers the ids so none is added twice; Decline adds nothing and remembers the ids so they
+  never come back. Either writes one `plan_assigned` line to the activity log, and the next sync tells the cloud
+  (`accepted` or `declined` with `answeredAt`; `SyncManager.sendPlanAnswers`), which the trainer sees on the client's Plans tab.
+  An accepted plan is an ordinary plan from then on: the user can change or delete it.
 - **Library.** `library/{exerciseId}` in the cloud is pulled into the local `library_exercises` table (pull-only, never
   written by the app). A new install starts from `assets/library.json`, the same file as `admin/seed/library.json`
   (Gradle adds that folder to the app's assets), so the library works offline from the first launch.

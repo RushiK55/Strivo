@@ -5,7 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.strivo.StrivoApp
 import com.example.strivo.domain.model.Plan
-import com.example.strivo.domain.plan.ReceivedPlan
+import com.example.strivo.domain.plan.PlanOffer
+import com.example.strivo.domain.plan.acceptedNotice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -16,22 +17,40 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     private val _plans = MutableStateFlow<List<Plan>>(emptyList())
     val plans: StateFlow<List<Plan>> = _plans
 
-    /** Plans the trainer sent lately, for the card on Home. */
-    private val _received = MutableStateFlow<List<ReceivedPlan>>(emptyList())
-    val received: StateFlow<List<ReceivedPlan>> = _received
+    /** What the trainer is offering that the user has not answered, for the card on Home (a week's plans are one offer). */
+    private val _offers = MutableStateFlow<List<PlanOffer>>(emptyList())
+    val offers: StateFlow<List<PlanOffer>> = _offers
+
+    /** A line saying what accepting did, shown once ("Added 7 plans to your week"). */
+    private val _notice = MutableStateFlow<String?>(null)
+    val notice: StateFlow<String?> = _notice
 
     fun refreshPlans() {
         viewModelScope.launch {
             _plans.value = repository.readAllPlans()
-            _received.value = repository.receivedPlans()
+            _offers.value = repository.planOffers()
         }
     }
 
-    fun dismissReceived(id: String) {
+    /** Adds every plan of the offer to the day the trainer chose. */
+    fun acceptOffer(offer: PlanOffer) {
         viewModelScope.launch {
-            repository.dismissReceivedPlan(id)
-            _received.value = repository.receivedPlans()
+            val added = repository.acceptOffer(offer)
+            _plans.value = repository.readAllPlans()
+            _offers.value = repository.planOffers()
+            if (added > 0) _notice.value = acceptedNotice(offer, added)
         }
+    }
+
+    fun declineOffer(offer: PlanOffer) {
+        viewModelScope.launch {
+            repository.declineOffer(offer)
+            _offers.value = repository.planOffers()
+        }
+    }
+
+    fun clearNotice() {
+        _notice.value = null
     }
 
     suspend fun addPlan(plan: Plan): Long {
