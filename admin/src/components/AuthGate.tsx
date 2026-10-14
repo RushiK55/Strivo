@@ -1,8 +1,12 @@
 'use client';
 // Shows the sign-in form until an admin is signed in, and the page after that.
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useAuth } from './AuthProvider';
-import { Field, Loading } from './ui';
+import { FormField, Loading } from './ui';
 
 const WRONG = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'];
 
@@ -22,16 +26,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 }
 
-const Centered = ({ children }: { children: ReactNode }) => <main className="center">{children}</main>;
+const Centered = ({ children }: { children: ReactNode }) => <main className="grid min-h-screen place-items-center p-6"><div className="w-full max-w-sm">{children}</div></main>;
 
 function Setup() {
   return (
     <Centered>
-      <div className="card narrow">
-        <h1>Almost there</h1>
-        <p>This dashboard needs your Firebase project settings. Copy <code>.env.example</code> to <code>.env.local</code>, fill it in, and build again.</p>
-        <p className="muted">Firebase console → Project settings → Your apps → Web app.</p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Almost there</CardTitle>
+          <CardDescription>
+            This dashboard needs your Firebase project settings. Copy <code>.env.example</code> to <code>.env.local</code>, fill it in, and build again.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-muted-foreground">Firebase console → Project settings → Your apps → Web app.</CardContent>
+      </Card>
     </Centered>
   );
 }
@@ -59,20 +67,24 @@ function SignIn({ notice }: { notice: string }) {
   const message = error || notice;
   return (
     <Centered>
-      <div className="card narrow">
-        <h1>Strivo Admin</h1>
-        <p className="muted">Sign in with an admin account.</p>
-        <form className="form" onSubmit={submit}>
-          <Field label="Email">
-            <input type="email" name="email" autoComplete="username" required autoFocus value={email} onChange={(event) => setEmail(event.target.value)} />
-          </Field>
-          <Field label="Password">
-            <input type="password" name="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
-          </Field>
-          <div role="alert">{message ? <div className="error">{message}</div> : null}</div>
-          <button className="btn btn-primary" type="submit" disabled={busy}>Sign in</button>
-        </form>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">Strivo <span className="text-primary">Admin</span></CardTitle>
+          <CardDescription>Sign in with an admin account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
+            <FormField label="Email">
+              {(id) => <Input id={id} type="email" name="email" autoComplete="username" required autoFocus value={email} onChange={(event) => setEmail(event.target.value)} />}
+            </FormField>
+            <FormField label="Password">
+              {(id) => <Input id={id} type="password" name="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />}
+            </FormField>
+            <div role="alert">{message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}</div>
+            <Button type="submit" disabled={busy}>Sign in</Button>
+          </form>
+        </CardContent>
+      </Card>
     </Centered>
   );
 }

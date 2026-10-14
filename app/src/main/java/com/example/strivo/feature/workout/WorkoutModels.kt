@@ -15,6 +15,11 @@ data class WorkoutState(
     val activeRestExerciseIndex: Int? = null,
     val activeRestSetIndex: Int? = null,
     val expandedExercises: Set<Int> = emptySet(),
+    /**
+     * The exercise the user is working on: the one they last started a set of (or opened the workout at). The workout stays
+     * in it until it is done, then goes back to the earliest exercise still to do. Null once that exercise is finished.
+     */
+    val currentExerciseIndex: Int? = null,
     /** What the last finished set was saved as, e.g. "Bench Press · Set 2: 40 kg × 10"; cleared when the next set starts. */
     val lastSavedSet: String? = null,
 )

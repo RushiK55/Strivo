@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.strivo.StrivoApp
 import com.example.strivo.domain.model.Plan
+import com.example.strivo.domain.plan.ReceivedPlan
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -15,8 +16,22 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
     private val _plans = MutableStateFlow<List<Plan>>(emptyList())
     val plans: StateFlow<List<Plan>> = _plans
 
+    /** Plans the trainer sent lately, for the card on Home. */
+    private val _received = MutableStateFlow<List<ReceivedPlan>>(emptyList())
+    val received: StateFlow<List<ReceivedPlan>> = _received
+
     fun refreshPlans() {
-        viewModelScope.launch { _plans.value = repository.readAllPlans() }
+        viewModelScope.launch {
+            _plans.value = repository.readAllPlans()
+            _received.value = repository.receivedPlans()
+        }
+    }
+
+    fun dismissReceived(id: String) {
+        viewModelScope.launch {
+            repository.dismissReceivedPlan(id)
+            _received.value = repository.receivedPlans()
+        }
     }
 
     suspend fun addPlan(plan: Plan): Long {

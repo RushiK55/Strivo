@@ -181,9 +181,9 @@ internal fun SetRow(
                     }
                     if (isResting) {
                         val restTime by viewModel.restTime.collectAsStateWithLifecycle()
-                        Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.Warning, modifier = Modifier.size(13.dp))
+                        Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.Rest, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Resting $restTime", style = AppType.Caption, color = AppColors.Warning)
+                        Text("Resting $restTime", style = AppType.Caption, color = AppColors.Rest)
                     } else if (set.isCompleted && hasRest) {
                         Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.TextTertiary, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(4.dp))

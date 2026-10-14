@@ -1,6 +1,6 @@
 // Pure functions of the dashboard: no React, no Firebase. Covered by logic.test.ts.
 import type {
-  ActivityEvent, FoodRow, LibraryExercise, LibraryFields, LibraryInput, SessionExercise, SessionSet, Tone, UserStatus, UserSummary, WeightRow,
+  ActivityEvent, LibraryExercise, LibraryFields, LibraryInput, SessionExercise, SessionSet, Tone, UserStatus, UserSummary, WeightRow,
 } from './types';
 
 /** How each kind of activity the app records is shown. Unknown kinds still show, with a neutral label. */
@@ -9,6 +9,7 @@ export const EVENT_TYPES: Record<string, { label: string; tone: Tone }> = {
   plan_created: { label: 'Plan', tone: 'info' },
   plan_copied: { label: 'Plan', tone: 'info' },
   plan_deleted: { label: 'Plan', tone: 'warn' },
+  plan_assigned: { label: 'Plan', tone: 'good' },
   exercise_added: { label: 'Exercise', tone: 'info' },
   exercise_edited: { label: 'Exercise', tone: 'neutral' },
   exercise_removed: { label: 'Exercise', tone: 'warn' },
@@ -66,17 +67,15 @@ export function summarizeUsers(users: Pick<UserSummary, 'lastActiveAt'>[], now: 
   return summary;
 }
 
-/** The users matching what was typed, by name, email or last action, ignoring case. */
-export function matchesUser(user: Pick<UserSummary, 'name' | 'email' | 'lastEvent'>, query: string): boolean {
+/** The clients matching what was typed, by name or email, ignoring case. (Not the last action: an old line may name a food.) */
+export function matchesUser(user: Pick<UserSummary, 'name' | 'email'>, query: string): boolean {
   const text = query.trim().toLowerCase();
   if (!text) return true;
-  return [user.name, user.email, user.lastEvent].some((field) => typeof field === 'string' && field.toLowerCase().includes(text));
+  return [user.name, user.email].some((field) => typeof field === 'string' && field.toLowerCase().includes(text));
 }
 
-const dayKey = (ms: number): string => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
+/** The calendar day (UTC, like every time on the dashboard) as YYYY-MM-DD. */
+const dayKey = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
 export interface EventGroup<T extends { at: number }> { key: string; label: string; events: T[] }
 
@@ -95,6 +94,18 @@ export function groupEventsByDay<T extends { at: number }>(events: T[], now: num
     group.events.push(event);
   }
   return groups;
+}
+
+/**
+ * The text of an activity line that is safe to show a trainer. What a client eats is private, and the first versions of
+ * the app wrote the food's name into the line ("Logged "Dal and rice" (560 kcal) as dinner"); those lines are shown as
+ * "Logged a meal (560 kcal)" so an old line can never reveal a food. Newer lines carry no name, and pass through.
+ */
+export function safeSummary(type: string, summary: string): string {
+  if (type !== 'food_logged') return summary;
+  if (/^Logged (breakfast|lunch|dinner|snack) \(/.test(summary)) return summary;
+  const kcal = /\((\d+) kcal/.exec(summary)?.[1];
+  return kcal ? `Logged a meal (${kcal} kcal)` : 'Logged a meal';
 }
 
 /** The kinds of activity present in a list, for the filter chips ("Workout", "Plan", ...). */
@@ -156,23 +167,19 @@ export function weightSeries(weights: WeightRow[]): { date: string; kg: number }
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
-/** Calories per day, newest first. */
-export function dayTotals(foods: FoodRow[]): { date: string; kcal: number; items: FoodRow[] }[] {
-  const byDay = new Map<string, { date: string; kcal: number; items: FoodRow[] }>();
-  for (const food of foods) {
-    const date = String(food.date ?? '');
-    const entry = byDay.get(date) ?? { date, kcal: 0, items: [] };
-    entry.kcal += Number(food.calories) || 0;
-    entry.items.push(food);
-    byDay.set(date, entry);
-  }
-  return [...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
-}
-
 // ---- Library ----
 
 export const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Full body'];
 export const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+export const MAX_MUSCLES = 8;
+
+/** A muscle group id as it is written in the catalogue: lower case words joined by dashes ("delt-front"). */
+const MUSCLE_ID = /^[a-z]+(-[a-z]+)*$/;
+
+/** The distinct, well-formed muscle ids of a list, in order. Anything else in it is dropped. */
+export function cleanMuscles(value: unknown): string[] {
+  return [...new Set((Array.isArray(value) ? value : []).filter((id): id is string => typeof id === 'string' && MUSCLE_ID.test(id)))];
+}
 
 /** A document id from a name: "Farmer's Walk" -> "farmer-s-walk". */
 export function slugify(name: string): string {
@@ -208,6 +215,11 @@ export function validateLibraryExercise(input: LibraryInput): LibraryCheck {
   if (!Number.isInteger(defaultReps) || defaultReps < 1 || defaultReps > 100) errors.defaultReps = 'Reps must be a whole number from 1 to 100.';
   if (!Number.isFinite(defaultWeightKg) || defaultWeightKg < 0 || defaultWeightKg > 1000) errors.defaultWeightKg = 'Weight must be from 0 to 1000 kg.';
   if (videoUrl && !/^https:\/\/\S+$/i.test(videoUrl)) errors.videoUrl = 'A video link must start with https://';
+  const primaryMuscles = cleanMuscles(input.primaryMuscles);
+  // a muscle that is a main one is not also listed as a helper
+  const secondaryMuscles = cleanMuscles(input.secondaryMuscles).filter((id) => !primaryMuscles.includes(id));
+  if (primaryMuscles.length > MAX_MUSCLES) errors.primaryMuscles = `Choose at most ${MAX_MUSCLES} main muscles.`;
+  if (secondaryMuscles.length > MAX_MUSCLES) errors.secondaryMuscles = `Choose at most ${MAX_MUSCLES} helping muscles.`;
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
@@ -224,8 +236,26 @@ export function validateLibraryExercise(input: LibraryInput): LibraryCheck {
       defaultWeightKg,
       videoUrl,
       active: input.active !== false,
+      primaryMuscles,
+      secondaryMuscles,
     },
   };
+}
+
+/**
+ * Exercises already in the library that have no muscles yet, for which the starter library knows them: what "Fill in
+ * muscles" writes. Exercises that already have muscles are never touched, so an edit is not undone.
+ */
+export function musclesToFill(
+  seed: { id?: string; primaryMuscles?: string[]; secondaryMuscles?: string[] }[],
+  existing: Pick<LibraryExercise, 'id' | 'primaryMuscles'>[],
+): { id: string; primaryMuscles: string[]; secondaryMuscles: string[] }[] {
+  const without = new Set(existing.filter((exercise) => !(exercise.primaryMuscles?.length)).map((exercise) => exercise.id));
+  return seed.flatMap((exercise) => {
+    const primary = cleanMuscles(exercise.primaryMuscles);
+    if (!exercise.id || !without.has(exercise.id) || !primary.length) return [];
+    return [{ id: exercise.id, primaryMuscles: primary, secondaryMuscles: cleanMuscles(exercise.secondaryMuscles).filter((id) => !primary.includes(id)) }];
+  });
 }
 
 /** The starter exercises that are not in the library yet (matched by id), so importing never overwrites an edit. */
@@ -244,4 +274,42 @@ export function filterLibrary(exercises: LibraryExercise[], { query, group, stat
     .filter((e) => (!group || e.muscleGroup === group) && (status === 'all' || (status === 'active') === !!e.active))
     .filter((e) => !text || [e.name, e.muscleGroup, e.equipment].some((f) => typeof f === 'string' && f.toLowerCase().includes(text)))
     .sort((a, b) => order(a.muscleGroup) - order(b.muscleGroup) || String(a.name).localeCompare(String(b.name)));
+}
+
+// ---- Charts and small display helpers ----
+
+/** Actions per calendar day for the last `days` days, oldest first, with zero for quiet days. */
+export function actionsPerDay(events: Pick<ActivityEvent, 'at'>[], days: number, now: number = Date.now()): { date: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const event of events) counts.set(dayKey(event.at), (counts.get(dayKey(event.at)) ?? 0) + 1);
+  return Array.from({ length: days }, (_, i) => {
+    const date = dayKey(now - (days - 1 - i) * DAY);
+    return { date, count: counts.get(date) ?? 0 };
+  });
+}
+
+/** What users do most: the number of actions per kind ("Workout", "Plan", ...), most common first. */
+export function kindBreakdown(events: Pick<ActivityEvent, 'type'>[]): { label: string; count: number; share: number }[] {
+  const counts = new Map<string, number>();
+  for (const event of events) counts.set(eventLabel(event.type), (counts.get(eventLabel(event.type)) ?? 0) + 1);
+  return [...counts.entries()]
+    .map(([label, count]) => ({ label, count, share: events.length ? count / events.length : 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/** How many users are in each status, for the filter on the users page. */
+export function statusCounts(users: Pick<UserSummary, 'lastActiveAt'>[], now: number = Date.now()): Record<UserStatus, number> {
+  const counts: Record<UserStatus, number> = { online: 0, today: 0, week: 0, inactive: 0, never: 0 };
+  for (const user of users) counts[userStatus(user.lastActiveAt, now)] += 1;
+  return counts;
+}
+
+/** One or two letters for an avatar: from the name, else from the email. */
+export function initials(name: string | undefined, email: string | undefined): string {
+  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
+  const [first, second] = words;
+  if (first && second) return (first.charAt(0) + second.charAt(0)).toUpperCase();
+  if (first) return first.slice(0, 2).toUpperCase();
+  const local = (email ?? '').split('@')[0] ?? '';
+  return local ? local.slice(0, 2).toUpperCase() : '?';
 }

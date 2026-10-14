@@ -186,9 +186,10 @@ fun ProfileScreen(
                 }
             }
 
-            // Said plainly: an admin can see this account's plans, workouts and activity, so the user is told.
+            // Said plainly, and precisely: the trainer sees training and body progress and daily calories and protein, but
+            // never what was eaten (the food log is the user's own backup; the trainer's dashboard cannot read it).
             Text(
-                "Your plans, workouts and activity are backed up to your account. The Strivo team can see them to help with support and to improve the app.",
+                "Your trainer can see your plans, workouts, body weight and your daily calories and protein, to coach you. They cannot see what you eat. Your data is backed up to your account.",
                 style = AppType.Caption,
                 color = AppColors.TextTertiary,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp),

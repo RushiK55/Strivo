@@ -2,6 +2,7 @@
 // Loading data in a component. `load` must be stable (wrap it in useCallback): a new function means a new request.
 import { useCallback, useEffect, useState } from 'react';
 import type { Cursor, Page } from './data';
+import { paginate } from './paging';
 
 interface LoadState<T> { load: unknown; tick: number; data?: T; error?: unknown }
 
@@ -76,4 +77,13 @@ export function usePaged<T>(fetchPage: (after: Cursor | null) => Promise<Page<T>
   }, [fetchPage, first.data, last, extra]);
 
   return { items, loading: first.loading && !first.data, error: first.error, hasMore, loadingMore, moreError, loadMore };
+}
+
+/** Which page of a list is showing, and how many rows per page. Pass the length of the (filtered) list. */
+export function usePagination(total: number, initialSize = 10) {
+  const [page, setPage] = useState(1);
+  const [size, setSizeState] = useState(initialSize);
+  const info = paginate(total, page, size);
+  const setSize = useCallback((next: number) => { setSizeState(next); setPage(1); }, []);
+  return { ...info, size, setPage, setSize };
 }

@@ -1,85 +1,161 @@
 'use client';
-// The first page: how many users, how many are active, and what is happening right now.
+// The first page, for the owner or trainer: how many clients came this week, who needs a nudge, and the latest workouts.
+import { CalendarCheck, Dumbbell, TriangleAlert, UserCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback } from 'react';
-import { EventList, UserCell, lastSeen } from '@/components/EventList';
-import { ErrorBox, Loading } from '@/components/ui';
-import { countActiveUsers, countEventsSince, countLibrary, countUsers, listEvents, listUsers } from '@/lib/data';
-import { fmtNumber } from '@/lib/format';
+import { BarSeries } from '@/components/Charts';
+import { TrainingBadge } from '@/components/ClientParts';
+import { UserCell, userHref } from '@/components/EventList';
+import { Empty, ErrorBox, Page, PageSkeleton, Stat } from '@/components/ui';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { lastWorkoutText, sortClients, trainingStatus, workoutDates, workoutsPerDay } from '@/lib/coaching';
+import { countUsers, listUsers, listWorkoutsSince } from '@/lib/data';
+import { fmtNumber, fmtShortDay } from '@/lib/format';
 import { useLoad } from '@/lib/hooks';
-import { loadNames, rememberUsers } from '@/lib/names';
+import { durationText, parseJsonField, relativeTime, sessionVolume } from '@/lib/logic';
+import { loadNames, nameOf, rememberUsers } from '@/lib/names';
+import type { ClientWorkout, SessionExercise, UserSummary } from '@/lib/types';
 
 const DAY = 24 * 60 * 60 * 1000;
+const isoDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
-const shown = (result: PromiseSettledResult<number>): string => (result.status === 'fulfilled' ? fmtNumber(result.value) : '–');
-
-function firstFailure(results: PromiseSettledResult<unknown>[]): unknown {
-  for (const result of results) if (result.status === 'rejected') return result.reason;
-  return undefined;
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="stat">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}</span>
-    </div>
-  );
+interface OverviewData {
+  now: number;
+  /** All clients, counted on the server; `clients` below are only the most recently active page of them. */
+  total: number;
+  clients: UserSummary[];
+  partial: boolean;
+  recent: ClientWorkout[];
+  perDay: { date: string; count: number; label: string }[];
+  thisWeek: number;
+  failure: unknown;
 }
 
 export function OverviewView() {
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<OverviewData> => {
     const now = Date.now();
-    const [users, active, events, library, feed, newest] = await Promise.allSettled([
-      countUsers(), countActiveUsers(now - 7 * DAY), countEventsSince(now - DAY), countLibrary(), listEvents({ pageSize: 15 }), listUsers(),
-    ]);
-    const directory = newest.status === 'fulfilled' ? newest.value.items : [];
-    rememberUsers(directory);
-    const recent = feed.status === 'fulfilled' ? feed.value.items : [];
-    // Names for the people in the feed that are not in the first page of users.
-    await loadNames(recent.map((event) => event.uid));
+    const [total, people, workouts] = await Promise.allSettled([countUsers(), listUsers(), listWorkoutsSince(isoDay(now - 13 * DAY))]);
+    const clients = people.status === 'fulfilled' ? people.value : { items: [], hasMore: false, last: null };
+    const recent = workouts.status === 'fulfilled' ? workouts.value : [];
+    rememberUsers(clients.items);
+    await loadNames(recent.slice(0, 8).map((workout) => workout.uid));
+    const failed = [total, people, workouts].find((result) => result.status === 'rejected');
     return {
-      counts: { users: shown(users), active: shown(active), events: shown(events), library: shown(library) },
+      now,
+      total: total.status === 'fulfilled' ? total.value : clients.items.length,
+      clients: clients.items,
+      partial: clients.hasMore,
       recent,
-      directory,
-      failure: firstFailure([users, active, events, library, feed, newest]),
+      perDay: workoutsPerDay(workoutDates(recent), 14, now).map((day) => ({ ...day, label: fmtShortDay(day.date) })),
+      thisWeek: recent.filter((workout) => String(workout.date ?? '').slice(0, 10) >= isoDay(now - 6 * DAY)).length,
+      failure: failed?.status === 'rejected' ? failed.reason : undefined,
     };
   }, []);
   const { data, error } = useLoad(load);
 
   return (
-    <div className="page">
-      <h1>Overview</h1>
+    <Page title="Overview" description="How your clients are training this week.">
       {error ? <ErrorBox error={error} /> : null}
-      {!data ? <Loading /> : (
-        <>
-          {data.failure ? <ErrorBox error={data.failure} /> : null}
-          <div className="stats">
-            <Stat label="Users" value={data.counts.users} />
-            <Stat label="Active in the last 7 days" value={data.counts.active} />
-            <Stat label="Actions in the last 24 hours" value={data.counts.events} />
-            <Stat label="Library exercises" value={data.counts.library} />
-          </div>
-          <div className="columns">
-            <section className="panel">
-              <h2>Recent activity</h2>
-              <EventList events={data.recent} showUser />
-              <p><Link href="/activity/">See all activity</Link></p>
-            </section>
-            <section className="panel">
-              <h2>Recently active users</h2>
-              {data.directory.length ? (
-                <ul className="plain">
-                  {data.directory.slice(0, 8).map((user) => (
-                    <li key={user.uid} className="row"><UserCell user={user} /><span className="muted">{lastSeen(user)}</span></li>
-                  ))}
-                </ul>
-              ) : <p className="empty">Nobody has signed in with the new app yet.</p>}
-              <p><Link href="/users/">See all users</Link></p>
-            </section>
-          </div>
-        </>
-      )}
-    </div>
+      {!data ? <PageSkeleton stats={4} /> : <Body data={data} />}
+    </Page>
+  );
+}
+
+function Body({ data }: { data: OverviewData }) {
+  const { now, clients } = data;
+  const trained = clients.filter((client) => (client.stats?.workouts7d ?? 0) > 0).length;
+  const needNudge = sortClients(clients, 'attention').filter((client) => ['slipping', 'missing', 'never'].includes(trainingStatus(client.stats, now)));
+  const mostActive = sortClients(clients, 'workouts').filter((client) => (client.stats?.workouts30d ?? 0) > 0).slice(0, 5);
+  const share = clients.length ? `${Math.round((trained / clients.length) * 100)}% of clients${data.partial ? ` (the ${clients.length} most recently active)` : ''}` : undefined;
+  return (
+    <>
+      {data.failure ? <ErrorBox error={data.failure} /> : null}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat icon={Users} label="Clients" value={fmtNumber(data.total)} />
+        <Stat icon={UserCheck} label="Trained in the last 7 days" value={fmtNumber(trained)} note={share} />
+        <Stat icon={Dumbbell} label="Workouts in the last 7 days" value={fmtNumber(data.thisWeek)} />
+        <Stat icon={TriangleAlert} label="Need a nudge" value={fmtNumber(needNudge.length)} note="no workout for 4 days or more" />
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg">Workouts per day</CardTitle>
+            <CardDescription>Finished workouts of all clients, the last 14 days.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarSeries data={data.perDay} xKey="label" yKey="count" label="Workouts" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Needs a nudge</CardTitle>
+            <CardDescription>Clients who have not trained for a while.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {needNudge.length ? (
+              <ul className="divide-y">
+                {needNudge.slice(0, 6).map((client) => (
+                  <li key={client.uid} className="flex items-center justify-between gap-3 py-2.5">
+                    <UserCell user={client} />
+                    <span className="flex flex-none flex-col items-end gap-1">
+                      <TrainingBadge stats={client.stats} />
+                      <span className="text-xs text-muted-foreground">{`last: ${lastWorkoutText(client.stats, now)}`}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-muted-foreground">Everyone is on track.</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg">Latest workouts</CardTitle>
+            <CardAction><Button variant="ghost" size="sm" render={<Link href="/attendance/" />} nativeButton={false}><CalendarCheck /> Attendance</Button></CardAction>
+          </CardHeader>
+          <CardContent>
+            {data.recent.length ? (
+              <ul className="divide-y">
+                {data.recent.slice(0, 8).map((workout) => {
+                  const volume = sessionVolume(parseJsonField<SessionExercise[]>(workout.exercises, []));
+                  return (
+                    <li key={`${workout.uid}/${workout.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                      <span>
+                        <Link href={userHref(workout.uid)} className="font-semibold text-primary hover:underline">{nameOf(workout.uid)}</Link>
+                        {` did ${workout.planName || 'a workout'}`}
+                        <span className="text-muted-foreground">{` · ${durationText(workout.totalTime) || '–'}${volume > 0 ? ` · ${fmtNumber(Math.round(volume))} kg lifted` : ''}`}</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{relativeTime(Date.parse(String(workout.date ?? '')), now)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : <Empty>No workouts in the last 14 days.</Empty>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Most workouts</CardTitle>
+            <CardDescription>The last 30 days.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {mostActive.length ? (
+              <ul className="divide-y">
+                {mostActive.map((client) => (
+                  <li key={client.uid} className="flex items-center justify-between gap-3 py-2.5">
+                    <UserCell user={client} />
+                    <span className="flex-none font-semibold tabular-nums">{client.stats?.workouts30d}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-muted-foreground">No workouts recorded yet.</p>}
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
 }

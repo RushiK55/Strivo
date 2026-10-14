@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  dayTotals, describeSets, durationText, eventKinds, eventLabel, eventTone, filterLibrary, groupEventsByDay, matchesUser, missingFromLibrary,
-  MUSCLE_GROUPS, parseJsonField, relativeTime, sessionVolume, slugify, summarizeUsers, userStatus, validateLibraryExercise, weightSeries,
+  actionsPerDay, cleanMuscles, describeSets, durationText, eventKinds, eventLabel, eventTone, filterLibrary, groupEventsByDay, initials, kindBreakdown, matchesUser, missingFromLibrary, safeSummary,
+  MUSCLE_GROUPS, musclesToFill, parseJsonField, relativeTime, sessionVolume, slugify, statusCounts, summarizeUsers, userStatus, validateLibraryExercise, weightSeries,
 } from './logic';
 import type { LibraryExercise, LibraryInput } from './types';
 
@@ -47,11 +47,11 @@ describe('users', () => {
     expect(summarizeUsers(users, NOW)).toEqual({ total: 5, today: 2, week: 3, inactive: 2 });
   });
 
-  it('are searched by name, email and last action', () => {
+  it('are searched by name and email', () => {
     const user = { name: 'Aisha Khan', email: 'aisha@example.com', lastEvent: 'Finished "Push Day"' };
     expect(matchesUser(user, 'aisha')).toBe(true);
     expect(matchesUser(user, 'EXAMPLE.COM')).toBe(true);
-    expect(matchesUser(user, 'push day')).toBe(true);
+    expect(matchesUser(user, 'push day')).toBe(false); // the last action is not searched
     expect(matchesUser(user, 'bob')).toBe(false);
     expect(matchesUser(user, '  ')).toBe(true);
   });
@@ -91,11 +91,9 @@ describe('what a user saved', () => {
     expect(describeSets([{ weight: 60, reps: 8, isCompleted: false }])).toBe('');
   });
 
-  it('tidies weigh-ins and food for display', () => {
+  it('tidies weigh-ins for display', () => {
     expect(weightSeries([{ id: 'a', date: '2026-10-02', weight: 71 }, { id: 'b', date: 'bad', weight: 70 }, { id: 'c', date: '2026-10-01', weight: '72.5' }]))
       .toEqual([{ date: '2026-10-01', kg: 72.5 }, { date: '2026-10-02', kg: 71 }]);
-    const days = dayTotals([{ id: '1', date: '2026-10-01', calories: 300 }, { id: '2', date: '2026-10-02', calories: 500 }, { id: '3', date: '2026-10-01', calories: 200 }]);
-    expect(days.map((d) => [d.date, d.kcal])).toEqual([['2026-10-02', 500], ['2026-10-01', 500]]);
   });
 });
 
@@ -106,6 +104,24 @@ describe('the library', () => {
   };
   const check = (over: Partial<LibraryInput>) => validateLibraryExercise({ ...good, ...over });
   const errorsOf = (over: Partial<LibraryInput>) => { const r = check(over); return r.ok ? {} : r.errors; };
+
+  it('keeps the muscles an exercise trains, cleaned', () => {
+    const result = check({ primaryMuscles: ['lats', 'lats', 'Bad Id', 'biceps'], secondaryMuscles: ['biceps', 'mid-back', 7 as unknown as string] });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.primaryMuscles).toEqual(['lats', 'biceps']);
+      // biceps is a main muscle, so it is not repeated as a helper
+      expect(result.value.secondaryMuscles).toEqual(['mid-back']);
+    }
+    const none = check({});
+    if (none.ok) expect(none.value.primaryMuscles).toEqual([]);
+  });
+
+  it('refuses more muscles than the rules allow', () => {
+    const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+    expect(errorsOf({ primaryMuscles: many }).primaryMuscles).toMatch(/at most 8/i);
+    expect(errorsOf({ secondaryMuscles: many }).secondaryMuscles).toMatch(/at most 8/i);
+  });
 
   it('accepts and cleans a good exercise', () => {
     const result = check({ name: '  Bench Press  ' });
@@ -176,5 +192,76 @@ describe('the library', () => {
       expect(result.ok, `${exercise.name}: ${JSON.stringify(result.ok ? {} : result.errors)}`).toBe(true);
       expect(MUSCLE_GROUPS).toContain(exercise.muscleGroup);
     }
+  });
+});
+
+describe('filling in muscles on exercises that were added before they existed', () => {
+  const seed = [
+    { id: 'pull-up', primaryMuscles: ['lats'], secondaryMuscles: ['biceps', 'lats'] },
+    { id: 'curl', primaryMuscles: ['biceps'], secondaryMuscles: [] },
+    { id: 'no-muscles', primaryMuscles: [] },
+    { id: 'not-in-library', primaryMuscles: ['chest'] },
+  ];
+
+  it('writes only to exercises that have none, from what the starter library knows', () => {
+    const existing = [{ id: 'pull-up' }, { id: 'curl', primaryMuscles: ['biceps'] }, { id: 'no-muscles' }, { id: 'mine', primaryMuscles: undefined }];
+    expect(musclesToFill(seed, existing)).toEqual([{ id: 'pull-up', primaryMuscles: ['lats'], secondaryMuscles: ['biceps'] }]);
+  });
+
+  it('does nothing when every exercise already has its muscles', () => {
+    expect(musclesToFill(seed, [{ id: 'pull-up', primaryMuscles: ['lats'] }, { id: 'curl', primaryMuscles: ['biceps'] }])).toEqual([]);
+  });
+
+  it('reads a list of muscles safely', () => {
+    expect(cleanMuscles(undefined)).toEqual([]);
+    expect(cleanMuscles('lats')).toEqual([]);
+    expect(cleanMuscles(['lats', 'lats', 'delt-front', 'Delt Front', '', null])).toEqual(['lats', 'delt-front']);
+  });
+});
+
+describe('chart and avatar helpers', () => {
+  it('counts actions per day, with zero for quiet days', () => {
+    const events = [{ at: NOW - HOUR }, { at: NOW - 2 * HOUR }, { at: NOW - 2 * DAY }];
+    expect(actionsPerDay(events, 4, NOW)).toEqual([
+      { date: '2026-10-10', count: 0 },
+      { date: '2026-10-11', count: 1 },
+      { date: '2026-10-12', count: 0 },
+      { date: '2026-10-13', count: 2 },
+    ]);
+  });
+
+  it('ranks what users do most', () => {
+    const events = [{ type: 'plan_created' }, { type: 'plan_deleted' }, { type: 'workout_finished' }, { type: 'weird' }];
+    expect(kindBreakdown(events)).toEqual([
+      { label: 'Plan', count: 2, share: 0.5 },
+      { label: 'Other', count: 1, share: 0.25 },
+      { label: 'Workout', count: 1, share: 0.25 },
+    ]);
+    expect(kindBreakdown([])).toEqual([]);
+  });
+
+  it('counts users per status', () => {
+    const users = [{ lastActiveAt: NOW - MIN }, { lastActiveAt: NOW - 3 * HOUR }, { lastActiveAt: NOW - 20 * DAY }, {}];
+    expect(statusCounts(users, NOW)).toEqual({ online: 1, today: 1, week: 0, inactive: 1, never: 1 });
+  });
+
+  it('makes avatar letters', () => {
+    expect(initials('Aisha Khan', 'x@y.z')).toBe('AK');
+    expect(initials('Madonna', undefined)).toBe('MA');
+    expect(initials('  ', 'bob@example.com')).toBe('BO');
+    expect(initials(undefined, undefined)).toBe('?');
+  });
+});
+
+describe('what a trainer may read of the activity lines', () => {
+  it('never shows what was eaten, even in lines an older version of the app wrote', () => {
+    expect(safeSummary('food_logged', 'Logged "Dal and rice" (560 kcal) as dinner')).toBe('Logged a meal (560 kcal)');
+    expect(safeSummary('food_logged', 'Logged "<img src=x onerror=1>Dal" (90 kcal) as snack')).toBe('Logged a meal (90 kcal)');
+    expect(safeSummary('food_logged', 'something unexpected with Dal')).toBe('Logged a meal');
+  });
+
+  it('leaves the lines without a food name alone', () => {
+    expect(safeSummary('food_logged', 'Logged dinner (560 kcal, 32 g protein)')).toBe('Logged dinner (560 kcal, 32 g protein)');
+    expect(safeSummary('workout_finished', 'Finished "Push Day": 2 exercises')).toBe('Finished "Push Day": 2 exercises');
   });
 });

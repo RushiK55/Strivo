@@ -1,5 +1,6 @@
 'use client';
 import type { ReactNode } from 'react';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthGate } from './AuthGate';
 import { AuthProvider } from './AuthProvider';
 import { FeedbackProvider } from './Feedback';
@@ -9,11 +10,13 @@ import { Shell } from './Shell';
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
-      <FeedbackProvider>
-        <AuthGate>
-          <Shell>{children}</Shell>
-        </AuthGate>
-      </FeedbackProvider>
+      <TooltipProvider>
+        <FeedbackProvider>
+          <AuthGate>
+            <Shell>{children}</Shell>
+          </AuthGate>
+        </FeedbackProvider>
+      </TooltipProvider>
     </AuthProvider>
   );
 }

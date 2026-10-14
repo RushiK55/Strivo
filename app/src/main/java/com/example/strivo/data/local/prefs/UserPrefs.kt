@@ -3,6 +3,7 @@ package com.example.strivo.data.local.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.strivo.core.util.todayIso
+import com.example.strivo.domain.plan.ReceivedPlan
 import java.time.DayOfWeek
 import java.time.LocalDate
 
@@ -197,6 +198,20 @@ class UserPrefs(context: Context, uid: String) {
         prefs.edit().putStringSet(KEY_FINISHED_PLANS, (kept + entries).toSet()).apply()
     }
 
+    // --- Plans from the trainer ---
+
+    /** Every plan a trainer sent that was added to this phone, so none is added twice. */
+    fun getReceivedPlans(): List<ReceivedPlan> = ReceivedPlan.listFromJson(prefs.getString(KEY_RECEIVED_PLANS, null))
+
+    fun addReceivedPlan(plan: ReceivedPlan) = saveReceivedPlans(getReceivedPlans().filter { it.id != plan.id } + plan)
+
+    fun dismissReceivedPlan(id: String) = saveReceivedPlans(getReceivedPlans().map { if (it.id == id) it.copy(dismissed = true) else it })
+
+    private fun saveReceivedPlans(plans: List<ReceivedPlan>) {
+        // commit, not apply: this list is what stops a plan from being added twice if the app closes right after.
+        prefs.edit().putString(KEY_RECEIVED_PLANS, ReceivedPlan.listToJson(plans)).commit()
+    }
+
     // --- Daily reset ---
 
     /** Returns true (once per calendar day) when the daily reset should run. */
@@ -234,6 +249,7 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_DEMO_ACTIVITY = "demo_activity_ids"
         private const val KEY_DEMO_WEIGHTS = "demo_weight_dates"
         private const val KEY_FINISHED_PLANS = "finished_plans"
+        private const val KEY_RECEIVED_PLANS = "received_plans"
         private const val MARKER = -1L // stands for the plan itself in a finished-plans entry
     }
 }

@@ -55,6 +55,7 @@ internal fun WorkoutTimerHeader(
     viewModel: WorkoutViewModel,
     isRunning: Boolean,
     isPaused: Boolean,
+    isResting: Boolean,
     doneSets: Int,
     totalSets: Int,
     doneExercises: Int,
@@ -100,7 +101,16 @@ internal fun WorkoutTimerHeader(
                 )
             }
             Spacer(Modifier.width(10.dp))
-            val buttonColor by animateColorAsState(if (isRunning) AppColors.WarningAccent else AppColors.Accent, tween(250), label = "startColor")
+            // Yellow = ready, orange = running, red = resting between sets or exercises.
+            val buttonColor by animateColorAsState(
+                when {
+                    isRunning && isResting -> AppColors.Rest
+                    isRunning -> AppColors.WarningAccent
+                    else -> AppColors.Accent
+                },
+                tween(250),
+                label = "startColor",
+            )
             Row(
                 modifier = Modifier
                     .height(44.dp)
@@ -159,15 +169,15 @@ private fun RestCard(title: String, time: String, onSkip: (() -> Unit)?, modifie
         modifier = modifier
             .fillMaxWidth()
             .clip(AppShapes.Control)
-            .background(AppColors.Warning.copy(alpha = 0.12f))
+            .background(AppColors.Rest.copy(alpha = 0.14f))
             .padding(start = 14.dp, top = 6.dp, bottom = 6.dp, end = if (onSkip == null) 16.dp else 4.dp)
             .height(44.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.Warning, modifier = Modifier.size(18.dp))
+        Icon(Icons.Rounded.HourglassTop, contentDescription = null, tint = AppColors.Rest, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(10.dp))
-        Text(title, style = AppType.BodyStrong, color = AppColors.Warning, modifier = Modifier.weight(1f), maxLines = 1)
-        Text(time, style = AppType.Headline.copy(fontFeatureSettings = "tnum"), color = AppColors.Warning)
+        Text(title, style = AppType.BodyStrong, color = AppColors.Rest, modifier = Modifier.weight(1f), maxLines = 1)
+        Text(time, style = AppType.Headline.copy(fontFeatureSettings = "tnum"), color = AppColors.Rest)
         if (onSkip != null) {
             TextButton(onClick = onSkip) { Text("Skip", style = AppType.BodyStrong, color = AppColors.TextPrimary) }
         }

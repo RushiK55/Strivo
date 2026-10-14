@@ -6,16 +6,26 @@ import android.net.NetworkCapabilities
 import com.example.strivo.data.local.db.StrivoDatabase
 import com.example.strivo.data.local.db.SyncTables
 import com.example.strivo.data.local.prefs.UserPrefs
+import com.example.strivo.domain.activity.ClientStats
+import com.example.strivo.domain.activity.DayNutrition
+import com.example.strivo.domain.activity.clientStats
+import com.example.strivo.domain.activity.nutritionByDay
+import com.example.strivo.domain.activity.planAssigned
 import com.example.strivo.domain.model.LibraryExercise
+import com.example.strivo.domain.model.Plan
+import com.example.strivo.domain.plan.PlanAssignment
+import com.example.strivo.domain.plan.ReceivedPlan
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
+import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -68,6 +78,8 @@ class SyncManager(
     private var failures = 0
     private var retryNotBefore = 0L
     private var lastUserSummaryAt = 0L
+    /** The daily nutrition totals last written to the cloud, by date, so only a day that changed is written again. */
+    private var publishedNutrition = mapOf<String, Map<String, Any>>()
 
     private val firestore: FirebaseFirestore
         get() = firestoreInstance()
@@ -190,6 +202,7 @@ class SyncManager(
         }
         if (pullProfile()) applied = true
         if (pullLibrary()) applied = true
+        if (pullAssignedPlans()) applied = true
         if (applied) onCloudDataApplied()
     }
 
@@ -209,6 +222,37 @@ class SyncManager(
     }
 
     /**
+     * Plans a trainer sent from the dashboard (users/{uid}/assigned, status "sent"). Each is added to this phone's plans
+     * once (the ids already added are remembered on the phone), then marked delivered in the cloud so the trainer sees it
+     * arrived. Adding comes first: if marking fails, the next sync only retries the mark. Best effort, like the library.
+     */
+    private suspend fun pullAssignedPlans(): Boolean = try {
+        val snapshot = withTimeout(READ_TIMEOUT_MILLIS) {
+            userDoc().collection("assigned").whereEqualTo("status", PlanAssignment.STATUS_SENT).get(Source.SERVER).await()
+        }
+        val received = prefs.getReceivedPlans().map { it.id }.toSet()
+        var added = false
+        snapshot.documents.forEach { document ->
+            val assignment = PlanAssignment.fromMap(document.id, document.data ?: emptyMap()) ?: return@forEach
+            val now = System.currentTimeMillis()
+            if (assignment.id !in received) {
+                val planId = db.importPlan(Plan(planName = assignment.planName, planDay = assignment.day), assignment.exercises, planAssigned(assignment, now))
+                prefs.addReceivedPlan(ReceivedPlan.from(assignment, planId, now))
+                added = true
+            }
+            withTimeout(WRITE_TIMEOUT_MILLIS) {
+                document.reference.update(mapOf("status" to PlanAssignment.STATUS_DELIVERED, "deliveredAt" to now)).await()
+            }
+        }
+        if (added) wake.trySend(false) // upload the new plan
+        added
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
      * Keeps a small summary of this user at users/{uid} for the admin dashboard: who they are, when they were last
      * active and what they last did. At most every five minutes, and never at the cost of the backup itself.
      */
@@ -219,7 +263,12 @@ class SyncManager(
             val user = FirebaseAuth.getInstance().currentUser?.takeIf { it.uid == uid } ?: return
             val latest = db.readEvents(1).firstOrNull()
             val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull()
+            val nutrition = nutritionByDay(db.readRealFood())
+            val stats = clientStats(db.readRealSessionTimes(), db.plannedDayCount(), db.readRealWeights(), nutrition, LocalDate.now())
             val summary = buildMap<String, Any> {
+                // The figures a trainer's list shows; one that no longer exists (say the last weigh-in was deleted) is removed.
+                val figures = stats.toMap()
+                put("stats", ClientStats.FIELDS.associateWith { figures[it] ?: FieldValue.delete() } + ("updatedAt" to now))
                 put("email", user.email.orEmpty())
                 put("name", user.displayName.orEmpty())
                 put("lastActiveAt", now)
@@ -229,12 +278,32 @@ class SyncManager(
                 latest?.let { put("lastEvent", it.summary); put("lastEventAt", it.at); put("lastEventType", it.type) }
             }
             withTimeout(WRITE_TIMEOUT_MILLIS) { userDoc().set(summary, SetOptions.merge()).await() }
+            publishNutrition(nutrition, now)
             lastUserSummaryAt = now
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Best effort: try again on the next sync.
         }
+    }
+
+    /**
+     * Writes each recent day's calorie and protein totals to users/{uid}/nutrition/{date}. This is what the trainer's
+     * dashboard reads instead of the food log, which it is not allowed to read (so it never learns what was eaten).
+     * Only days that changed are written, and a day with nothing logged any more is removed.
+     */
+    private suspend fun publishNutrition(days: List<DayNutrition>, now: Long) {
+        val since = LocalDate.now().minusDays(NUTRITION_DAYS)
+        val current = days.filter { !it.date.isBefore(since) }.associate { it.date.toString() to it.toMap() }
+        val writes = current.filter { (date, day) -> publishedNutrition[date] != day }
+        val removals = publishedNutrition.keys - current.keys
+        if (writes.isEmpty() && removals.isEmpty()) return
+        val batch = firestore.batch()
+        val collection = userDoc().collection("nutrition")
+        writes.forEach { (date, day) -> batch.set(collection.document(date), day + ("updatedAt" to now)) }
+        removals.forEach { date -> batch.delete(collection.document(date)) }
+        withTimeout(WRITE_TIMEOUT_MILLIS) { batch.commit().await() }
+        publishedNutrition = current
     }
 
     /** Takes the cloud's profile when it is newer than this phone's and this phone has no profile change of its own waiting. */
@@ -296,6 +365,7 @@ class SyncManager(
     private companion object {
         const val POLL_MILLIS = 15_000L
         const val USER_SUMMARY_MILLIS = 5 * 60_000L
+        const val NUTRITION_DAYS = 90L
         const val BATCH_SIZE = 400 // Firestore allows 500 writes per batch
         const val WRITE_TIMEOUT_MILLIS = 30_000L
         const val READ_TIMEOUT_MILLIS = 30_000L

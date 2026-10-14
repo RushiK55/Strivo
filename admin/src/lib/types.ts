@@ -1,9 +1,28 @@
 // The shapes of what the app writes to Firestore, as the dashboard reads them. Fields are optional where an older
 // version of the app, or a user who has not synced yet, may not have written them.
 
+/**
+ * users/{uid}/stats: a short training summary of a client that the app keeps up to date (the figures a trainer sees in
+ * the client list). Older versions of the app do not write it.
+ */
+export interface ClientStats {
+  workouts7d: number;
+  workouts30d: number;
+  lastWorkoutAt?: number;
+  /** Weekdays the client has a plan for. */
+  plannedDays: number;
+  weightKg?: number;
+  /** Latest weight minus the first weigh-in of the last 30 days. */
+  weightChange30dKg?: number;
+  avgCalories7d?: number;
+  avgProteinG7d?: number;
+  updatedAt?: number;
+}
+
 /** users/{uid}: a short summary the app keeps up to date while it syncs. */
 export interface UserSummary {
   uid: string;
+  stats?: ClientStats;
   name?: string;
   email?: string;
   lastActiveAt?: number;
@@ -72,15 +91,23 @@ export interface WeightRow {
   id: string;
   date?: string;
   weight?: number | string;
+  isDemo?: number;
 }
 
-export interface FoodRow {
+/** users/{uid}/nutrition/{date}: one day's calorie and protein totals. Never says what was eaten. */
+export interface NutritionDay {
   id: string;
-  date?: string;
-  meal?: string;
-  name?: string;
-  calories?: number | string;
-  isDemo?: number;
+  date: string;
+  calories: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  meals?: number;
+}
+
+/** A finished workout of any client, from the all-clients query: who it belongs to comes with it. */
+export interface ClientWorkout extends WorkoutRow {
+  uid: string;
 }
 
 /** users/{uid}/meta/profile */
@@ -106,6 +133,9 @@ export interface LibraryExercise {
   defaultWeightKg: number;
   videoUrl: string;
   active: boolean;
+  /** Muscle group ids (models/anatomy/muscles.json) the exercise mainly trains, and the ones that help. Older exercises have none. */
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
   createdAt?: number;
   updatedAt?: number;
   updatedBy?: string;
@@ -124,10 +154,44 @@ export interface LibraryInput {
   defaultWeightKg: string | number;
   videoUrl: string;
   active: boolean;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
 }
 
 /** The part of a library exercise an admin edits (no id or timestamps). */
 export type LibraryFields = Omit<LibraryExercise, 'id' | 'createdAt' | 'updatedAt' | 'updatedBy'>;
+
+/** One exercise of a plan a trainer sends. */
+export interface AssignedExercise {
+  name: string;
+  sets: number;
+  reps: number;
+  weightKg: number;
+  dropSets: number;
+  notes: string;
+}
+
+/** What the trainer fills in when sending a plan. */
+export interface AssignmentFields {
+  planName: string;
+  /** A weekday, or 'Prebuilt' for the client's library of plans. */
+  day: string;
+  note: string;
+  sentByName: string;
+  exercises: AssignedExercise[];
+}
+
+/**
+ * users/{uid}/assigned/{id}: a plan a trainer sent. 'sent' until the client's app adds it to their plans and marks it
+ * 'delivered'. Only the trainer writes it (and may withdraw it while it is 'sent'); only the app marks it delivered.
+ */
+export interface Assignment extends AssignmentFields {
+  id: string;
+  status: 'sent' | 'delivered';
+  sentAt: number;
+  sentBy: string;
+  deliveredAt?: number;
+}
 
 /** admins/{uid} */
 export interface AdminEntry {
@@ -137,5 +201,5 @@ export interface AdminEntry {
   addedBy?: string;
 }
 
-export type Tone = 'neutral' | 'good' | 'info' | 'warn';
+export type Tone = 'neutral' | 'good' | 'info' | 'warn' | 'bad';
 export type UserStatus = 'online' | 'today' | 'week' | 'inactive' | 'never';

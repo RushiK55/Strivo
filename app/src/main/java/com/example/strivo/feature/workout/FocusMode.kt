@@ -69,6 +69,7 @@ import com.example.strivo.core.ui.theme.AppShapes
 import com.example.strivo.core.ui.theme.AppType
 import com.example.strivo.core.util.formatWeight
 import com.example.strivo.domain.model.SetType
+import com.example.strivo.domain.plan.nextSet
 
 // --- Focus mode ---
 
@@ -94,15 +95,11 @@ internal fun focusTarget(state: WorkoutState): FocusInfo? {
             return FocusInfo(activeExercise, activeSet, exercise.name, exercise.setsList.size, set.weight, set.reps, set.type, isRunning = true)
         }
     }
-    state.exercises.forEachIndexed { exerciseIndex, exercise ->
-        if (exercise.isCheck) return@forEachIndexed
-        val setIndex = exercise.setsList.indexOfFirst { !it.isCompleted }
-        if (setIndex >= 0) {
-            val set = exercise.setsList[setIndex]
-            return FocusInfo(exerciseIndex, setIndex, exercise.name, exercise.setsList.size, set.weight, set.reps, set.type, isRunning = false)
-        }
-    }
-    return null
+    // The exercise being worked on is finished first; then the earliest one still to do (see nextSet).
+    val next = nextSet(state.exercises, state.currentExerciseIndex) ?: return null
+    val exercise = state.exercises[next.exerciseIndex]
+    val set = exercise.setsList[next.setIndex]
+    return FocusInfo(next.exerciseIndex, next.setIndex, exercise.name, exercise.setsList.size, set.weight, set.reps, set.type, isRunning = false)
 }
 
 /**
@@ -139,10 +136,12 @@ internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: Workout
         val restingBetweenExercises = isResting && state.isExerciseRest
         var editing by remember { mutableStateOf<MetricEdit?>(null) }
 
+        // The button's colour is the phase: yellow = ready for a set, orange = a set is running, red = resting.
         val buttonColor by animateColorAsState(
             when {
                 paused -> AppColors.Accent
                 info.isRunning -> AppColors.WarningAccent
+                isResting -> AppColors.Rest
                 canStart -> AppColors.Accent
                 else -> AppColors.Field
             },
@@ -251,7 +250,8 @@ internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: Workout
                     else -> "Ready when you are"
                 }
                 val badgeColor = when {
-                    paused || isResting -> AppColors.Warning
+                    paused -> AppColors.Warning
+                    isResting -> AppColors.Rest
                     info.isRunning -> AppColors.WarningAccent
                     else -> AppColors.TextSecondary
                 }

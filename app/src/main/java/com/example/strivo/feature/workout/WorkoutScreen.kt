@@ -142,6 +142,7 @@ fun WorkoutScreen(
                         viewModel = viewModel,
                         isRunning = state.isWorkoutRunning,
                         isPaused = state.isPaused,
+                        isResting = state.showRestTimer && state.activeSetIndex == null && !state.isPaused,
                         doneSets = state.exercises.sumOf { ex -> ex.setsList.count { it.isCompleted } },
                         totalSets = state.exercises.sumOf { it.setsList.size },
                         doneExercises = state.exercises.count { it.isCheck },

@@ -1,6 +1,6 @@
 # Strivo
 
-Gym workout planner and tracker — native Android, built with **Kotlin** and **Jetpack Compose**.
+Gym workout planner and tracker â€” native Android, built with **Kotlin** and **Jetpack Compose**.
 
 ## Features
 
@@ -10,7 +10,7 @@ Gym workout planner and tracker — native Android, built with **Kotlin** and **
 - A coach that suggests the next weight (and a lighter week, protein, weigh-ins) from your own logs
 - Food and calorie log, body profile, cloud backup and restore
 - An exercise library (74 starter exercises, managed by an admin) that users browse and add to their plans
-- An admin web dashboard to follow each user's activity and manage the library (see [admin/README.md](admin/README.md))
+- A coach dashboard for the gym owner or trainer: attendance, who needs a nudge, each client's strength and body-weight progress and daily calories and protein (never what they eat), plus the exercise library; the trainer can send a client a plan, which the app adds on its next sync (see [admin/README.md](admin/README.md))
 
 ## Stack
 
@@ -29,8 +29,9 @@ app/src/main/java/com/example/strivo/
   domain/       models and the app's rules (analytics, coach, plan status), plain Kotlin
   data/         SQLite, preferences, Firebase, sync, repository, demo data
 
-admin/          the admin web dashboard (Next.js, exported as a static site for Firebase Hosting)
-tools/          tests that run on the Firebase emulators (security rules, the dashboard in a browser)
+admin/          the coach dashboard (Next.js, exported as a static site for Firebase Hosting)
+models/anatomy/ the male and female 3D body (optimized .glb files, the muscle catalogue and their credit); see models/anatomy/README.md
+tools/          tests that run on the Firebase emulators (security rules, the dashboard in a browser), and tools/anatomy, which builds the 3D models (from BodyParts3D and Z-Anatomy data)
 ```
 
 Dependencies only point downwards, and a unit test enforces it. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
@@ -51,9 +52,9 @@ Requires JDK 17+ and the Android SDK (compileSdk 37).
 ## Firebase setup
 
 1. In the [Firebase console](https://console.firebase.google.com) create a project and add an **Android app** with package name `strivo.app`.
-2. **Authentication → Sign-in method →** enable **Email/Password**.
+2. **Authentication â†’ Sign-in method â†’** enable **Email/Password**.
 3. Download `google-services.json` and put it in `app/` (next to `app/build.gradle.kts`).
-4. Rebuild. The Realtime Database URL, if you ever need it, is the `firebase_url` field inside that file — Authentication itself doesn't use it.
+4. Rebuild. The Realtime Database URL, if you ever need it, is the `firebase_url` field inside that file â€” Authentication itself doesn't use it.
 
 ## Cloud sync (Firestore)
 
@@ -66,14 +67,14 @@ Each account's data is backed up to **Cloud Firestore** under `users/{uid}`, and
 
 One-time setup in the Firebase console for this project:
 
-1. **Build → Firestore Database → Create database** (production mode).
+1. **Build â†’ Firestore Database â†’ Create database** (production mode).
 2. **Rules**: paste the contents of `firestore.rules` and publish.
 
-Until that is done the app still works fully offline, and Profile → "Cloud sync" shows what is wrong.
+Until that is done the app still works fully offline, and Profile â†’ "Cloud sync" shows what is wrong.
 
-## Admin dashboard and exercise library
+## Coach dashboard and exercise library
 
-The admin dashboard is a separate web app in `admin/`. Setting it up means publishing `firestore.rules`, adding a Web app
+The coach dashboard is a separate web app in `admin/`, for the gym owner or trainer (their clients are the app's users). Setting it up means publishing `firestore.rules`, adding a Web app
 config, creating the first admin and deploying the site; the steps are in [admin/README.md](admin/README.md).
 
 The phone app records what a user does (a plain-language activity log) and a short summary of who they are, both backed
@@ -83,5 +84,5 @@ exercises from `admin/seed/library.json`, which are bundled into the app.
 ## Firebase config (not in git)
 
 `app/google-services.json` holds this project's Firebase settings and API key, so it is git-ignored.
-Download your own copy from the Firebase console (Project settings → Your apps → Android) and put it in `app/`.
+Download your own copy from the Firebase console (Project settings â†’ Your apps â†’ Android) and put it in `app/`.
 `app/google-services.json.example` shows the expected shape.

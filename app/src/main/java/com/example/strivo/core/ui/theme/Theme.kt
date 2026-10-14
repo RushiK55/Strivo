@@ -41,6 +41,8 @@ object AppColors {
     val SetBorder = Color(0xFF34343A)
 
     val Danger = Color(0xFFFF5A5F)
+    /** The rest between sets and exercises on the workout screen: red, so it reads at a glance as a different phase from the set (orange). */
+    val Rest = Color(0xFFFF5A5F)
     val Success = Color(0xFF4ADE80)
     val Warning = Color(0xFFFF9F0A)
     val WarningAccent = Color(0xFFFFAB40)

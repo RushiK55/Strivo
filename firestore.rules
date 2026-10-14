@@ -2,8 +2,15 @@ rules_version = '2';
 
 // Strivo's Firestore rules.
 //
-//   users/{uid}            the user's profile summary, and everything under it (plans, workouts, food, activity events ...)
-//                          the user reads and writes their own; an admin can read everyone's but never change it
+//   users/{uid}            a client's summary, and everything under it (plans, workouts, body weight, food, activity events ...)
+//                          the client reads and writes their own. An admin (the trainer or owner) can read what coaching
+//                          needs: plans, workouts, body weight, profile, the activity log and the DAILY CALORIE AND PROTEIN
+//                          TOTALS (users/{uid}/nutrition). An admin can NOT read the food log (users/{uid}/food, which says
+//                          what was eaten) or the exercise history, and can never change anything of a client's,
+//                          except one thing:
+//   users/{uid}/assigned   plans a trainer SENDS to a client. An admin creates one (status "sent") and may withdraw it
+//                          until the app picks it up; the app adds it to the client's plans and marks it "delivered".
+//                          Nobody else writes here, the client included, so what the trainer sees is what was sent.
 //   library/{exerciseId}   the exercise library: every signed-in user reads it, only admins change it
 //   admins/{uid}           who is an admin; only an admin changes it. The first admin is created by hand in the
 //                          Firebase console (Firestore -> admins -> a document whose id is that person's uid)
@@ -34,17 +41,57 @@ service cloud.firestore {
         && d.defaultSets is int && d.defaultSets >= 1 && d.defaultSets <= 20
         && d.defaultReps is int && d.defaultReps >= 1 && d.defaultReps <= 100
         && d.defaultWeightKg is number && d.defaultWeightKg >= 0 && d.defaultWeightKg <= 1000
-        && d.active is bool;
+        && d.active is bool
+        // the muscles an exercise trains (ids from the muscle catalogue), optional; the dashboard checks the ids themselves
+        && d.get('primaryMuscles', []) is list && d.get('primaryMuscles', []).size() <= 8
+        && d.get('secondaryMuscles', []) is list && d.get('secondaryMuscles', []).size() <= 8;
+    }
+
+    // Shape of a plan a trainer sends. The app also clamps every value, so this only keeps out what is plainly wrong.
+    function validAssignment() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['planName', 'day', 'note', 'exercises', 'status', 'sentAt', 'sentBy', 'sentByName'])
+        && d.planName is string && d.planName.size() > 0 && d.planName.size() <= 60
+        && d.day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Prebuilt']
+        && d.note is string && d.note.size() <= 500
+        && d.exercises is list && d.exercises.size() > 0 && d.exercises.size() <= 30
+        && d.status == 'sent'
+        && d.sentAt is int
+        && d.sentBy == request.auth.uid
+        && d.sentByName is string && d.sentByName.size() <= 100;
     }
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow write: if isOwner(uid);
 
-      match /{document=**} {
-        allow read: if isOwner(uid) || isAdmin();
-        allow write: if isOwner(uid);
+      // The client reads and writes everything under their own id, except the plans their trainer sent (below).
+      match /{collection}/{rest=**} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid) && collection != 'assigned';
       }
+
+      // A trainer reads only these. The food log is deliberately not in the list: what someone eats is private.
+      match /{collection}/{docId} {
+        allow read: if isAdmin()
+          && collection in ['sessions', 'plans', 'exercises', 'weights', 'activities', 'events', 'nutrition', 'meta', 'assigned'];
+      }
+
+      match /assigned/{assignmentId} {
+        allow create: if isAdmin() && validAssignment();
+        // Withdrawn by a trainer while the app has not picked it up yet.
+        allow delete: if isAdmin() && resource.data.status == 'sent';
+        // The app marks it delivered once the plan is on the phone, and changes nothing else.
+        allow update: if isOwner(uid) && resource.data.status == 'sent'
+          && request.resource.data.status == 'delivered'
+          && request.resource.data.deliveredAt is int
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt']);
+      }
+    }
+
+    // The attendance page reads every client's finished workouts at once (a collection group query).
+    match /{path=**}/sessions/{sessionId} {
+      allow read: if isAdmin();
     }
 
     // The admin's activity feed reads every user's events at once (a collection group query).

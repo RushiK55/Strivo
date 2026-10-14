@@ -23,6 +23,7 @@ import com.example.strivo.domain.model.plannedSets
 import com.example.strivo.domain.model.setName
 import com.example.strivo.domain.model.suggestedDropKg
 import com.example.strivo.domain.model.suggestedWarmUpKg
+import com.example.strivo.domain.plan.nextSet
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -102,6 +103,8 @@ class WorkoutViewModel(
                     isLoading = false,
                     exercises = loaded,
                     expandedExercises = if (initialExerciseIndex in loaded.indices) setOf(initialExerciseIndex) else emptySet(),
+                    // Opening the workout at an exercise is the user's choice of where to start.
+                    currentExerciseIndex = initialExerciseIndex.takeIf { it in loaded.indices },
                 )
             }
         }
@@ -149,18 +152,14 @@ class WorkoutViewModel(
     }
 
     private fun startFirstSet() {
-        val exercises = _state.value.exercises
-        val target = exercises.indices.firstNotNullOfOrNull { exerciseIndex ->
-            val exercise = exercises[exerciseIndex]
-            if (exercise.isCheck) return@firstNotNullOfOrNull null
-            exercise.setsList.indexOfFirst { !it.isCompleted }.takeIf { it >= 0 }?.let { exerciseIndex to it }
-        }
+        val current = _state.value
+        val target = nextSet(current.exercises, current.currentExerciseIndex)
         if (target == null) {
             message("Everything in this plan is already done", MessageKind.Warning)
             return
         }
         // Starting the set also starts the workout clock (and checks the set has reps).
-        onSetButton(target.first, target.second)
+        onSetButton(target.exerciseIndex, target.setIndex)
     }
 
     fun resetWorkout() {
@@ -306,6 +305,8 @@ class WorkoutViewModel(
                 if (isLastSet) updated = updated.copy(isCheck = false)
                 commit(exerciseIndex, updated)
                 stopRest()
+                // Reopening a set is the user going back to that exercise.
+                _state.update { it.copy(currentExerciseIndex = exerciseIndex) }
             }
 
             isActive -> completeSet(exerciseIndex, exercise, setIndex, set, isLastSet)
@@ -332,7 +333,11 @@ class WorkoutViewModel(
 
         setWatch.reset()
         setWatch.start()
-        _state.update { it.copy(activeSetExerciseIndex = exerciseIndex, activeSetIndex = setIndex, lastSavedSet = null) }
+        // Starting a set makes its exercise the one being worked on, wherever in the plan it is: it is finished before the
+        // workout goes back to an exercise that was skipped. (Changing exercise by hand works the same way: the new one is now current.)
+        _state.update {
+            it.copy(activeSetExerciseIndex = exerciseIndex, activeSetIndex = setIndex, lastSavedSet = null, currentExerciseIndex = exerciseIndex)
+        }
         commit(exerciseIndex, exercise.copy(setsList = exercise.setsList.replaced(setIndex, set.copy(isStarted = true))))
         stopRest()
         if (!workoutWatch.isRunning) workoutWatch.start()
@@ -361,9 +366,10 @@ class WorkoutViewModel(
             return
         }
 
-        // Last set: the whole exercise is done.
+        // Last set: the whole exercise is done, so the workout is free to go back to the earliest exercise still to do.
         updated = updated.copy(isCheck = true)
         commit(exerciseIndex, updated)
+        _state.update { it.copy(currentExerciseIndex = null) }
         triggerRest(exerciseIndex, setIndex, isExerciseRest = true)
         setExpanded(exerciseIndex, false)
 
@@ -393,6 +399,7 @@ class WorkoutViewModel(
         val isLastExercise = exercises.all { it.isCheck || it.id == exercise.id }
 
         commit(exerciseIndex, exercise.copy(isCheck = true))
+        _state.update { it.copy(currentExerciseIndex = null) }
         setExpanded(exerciseIndex, false)
         val next = _state.value.exercises.indices.firstOrNull { !_state.value.exercises[it].isCheck && it != exerciseIndex }
         if (next != null) setExpanded(next, true) else workoutWatch.stop()

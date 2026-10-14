@@ -99,21 +99,46 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
 - Sets are stored as JSON inside their exercise or workout session. New fields (like a set's `type`) are optional in the
   JSON, so older data keeps loading.
 
-## Activity log, library and the admin dashboard
+## Activity log, library and the coach dashboard
 
+- **Who sees what.** The dashboard is for the gym owner or trainer (an admin); the app's users are their clients. A trainer
+  sees what coaching needs: workouts and the weights lifted, plans, body weight, profile, attendance, and the *daily calorie
+  and protein totals*. A trainer never sees what a client eats: the food log (`users/{uid}/food`) and the exercise history
+  are not readable by an admin (`firestore.rules`), and nothing the dashboard reads contains a food's name.
 - **Activity log.** `domain/activity/ActivityLog.kt` turns each user action into one plain line ("Added "Bench Press" to Push
   Day (Monday) · 4 × 8 @ 60 kg"). `StrivoRepository` records them as it saves (plans, exercises, finished workouts, food,
   weigh-ins, profile). They are stored in `activity_events`, which is a synced table, so they reach `users/{uid}/events`.
-  Demo data and things restored from the cloud are not recorded.
-- **User summary.** `SyncManager.publishUserSummary` keeps `users/{uid}` (name, email, last active, app version, last
-  action) up to date, at most every five minutes, so the dashboard can list users without reading their data.
+  Demo data and things restored from the cloud are not recorded. A food line says the meal and the calories ("Logged dinner
+  (560 kcal, 32 g protein)"), never the food; the schema upgrade to version 17 rewrites older lines that named it.
+- **Client summary.** `SyncManager.publishUserSummary` keeps `users/{uid}` (name, email, last active, app version, last
+  action) up to date, at most every five minutes, together with `stats` (`domain/activity/ClientStats.kt`): workouts in the
+  last 7 and 30 days, the last workout, weekdays with a plan, body weight and its change over 30 days, and the average
+  calories and protein of the last week. Built from real data only (demo rows are left out). A trainer's client list reads
+  just these documents.
+- **Daily intake.** The same publish writes one document per day to `users/{uid}/nutrition/{date}` (calories, protein,
+  carbs, fat, number of meals) for the last 90 days; only days that changed are written. This is the only thing from the
+  food log that reaches the trainer.
+- **Plans from the trainer.** A trainer sends a plan from the dashboard to `users/{uid}/assigned/{id}` (status `sent`).
+  `SyncManager.pullAssignedPlans` reads them on each pull, adds each one to the local plans once (`StrivoDatabase.importPlan`,
+  with a `plan_assigned` line in the activity log), remembers its id (`UserPrefs`), then marks it `delivered`. The pure part
+  (reading and clamping the document, the received list) is `domain/plan/PlanAssignment.kt`. Home shows a "From your
+  trainer" card (`feature/home/TrainerPlansCard.kt`) for the plans received in the last two weeks until the user hides it.
+  The added plan is an ordinary plan from then on: the user can change or delete it.
 - **Library.** `library/{exerciseId}` in the cloud is pulled into the local `library_exercises` table (pull-only, never
   written by the app). A new install starts from `assets/library.json`, the same file as `admin/seed/library.json`
   (Gradle adds that folder to the app's assets), so the library works offline from the first launch.
-- **Admin dashboard.** `admin/` is a Next.js app (React, TypeScript) exported as a static site for Firebase Hosting; its logic is in
-  `admin/src/lib` and tested with Vitest. It reads what users have saved and writes only
-  the library and the admin list. `firestore.rules` is what keeps it that way: an admin is a document in `admins/`, may
-  read all of `users/`, and may not write there.
+- **Coach dashboard.** `admin/` is a Next.js app (React, TypeScript, shadcn/ui) exported as a static site for Firebase
+  Hosting. Pages: Overview (who trained this week, who needs a nudge), Clients, Attendance (the last 14 days of every client),
+  a client's page (attendance, strength progression per exercise, body weight, daily intake, workouts, plans, activity),
+  Activity, Library and Team. Its logic is in `admin/src/lib` (`coaching.ts` is the training maths) and tested with Vitest.
+  It writes only the library, the team list and the plans it sends. `firestore.rules` is what keeps it that way: an admin is a document in
+  `admins/`, reads only the collections listed there (and the all-clients `sessions` and `events` queries), and may not
+  write to a client's data.
+- **3D body.** `models/anatomy` (built by `tools/anatomy` from BodyParts3D, the Human Reference Atlas and Z-Anatomy data) holds a male and a female
+  model with one node per muscle group and side, a skeleton and a smooth see-through skin layer over them (the female skin has a soft bust contour; no breast is drawn), and `muscles.json`, the
+  catalogue of 34 muscle groups. The dashboard's Body page shows it
+  (three.js); the app will use the same files. A library exercise names the muscles it trains (`primaryMuscles`, `secondaryMuscles`: catalogue ids,
+  in `library/{id}`, set in the dashboard; the starter library in `admin/seed/library.json` has them), which is how a clicked muscle lists its exercises.
 - **Emulator tests.** `tools/emulator-tests` runs the rules and the dashboard (in headless Chrome) against the Firebase
   emulators: `cd tools/emulator-tests && npm test`.
 

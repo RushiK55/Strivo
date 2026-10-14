@@ -16,6 +16,7 @@ import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.countsForRecords
 import com.example.strivo.domain.model.isWork
 import com.example.strivo.domain.model.toJsonString
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 /**
@@ -192,6 +193,35 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
             buildList { while (c.moveToNext()) c.toFoodEntry()?.let { add(it) } }
         }
 
+    // --- What the client's trainer may see (real data only, never demo rows) ---
+
+    /** When each real workout was finished. */
+    fun readRealSessionTimes(): List<LocalDateTime> =
+        readableDatabase.query("workout_sessions", arrayOf("date"), "isDemo = 0", null, null, null, null).use { c ->
+            buildList { while (c.moveToNext()) runCatching { LocalDateTime.parse(c.getString(0)) }.onSuccess { add(it) } }
+        }
+
+    /** The real food log: only used to add up each day's calories and protein for the trainer. */
+    fun readRealFood(): List<FoodEntry> =
+        readableDatabase.query("food_log", null, "isDemo = 0", null, null, null, "date, id").use { c ->
+            buildList { while (c.moveToNext()) c.toFoodEntry()?.let { add(it) } }
+        }
+
+    /** Real weigh-ins, oldest first, as (ISO date, kg). */
+    fun readRealWeights(): List<Pair<String, Double>> =
+        readableDatabase.query("weight_log", arrayOf("date", "weight"), "isDemo = 0", null, null, null, "date").use { c ->
+            buildList { while (c.moveToNext()) add(c.getString(0) to c.getDouble(1)) }
+        }
+
+    /** How many weekdays have a plan (the prebuilt library and the day's extra exercises are not plans for a day). */
+    fun plannedDayCount(): Int {
+        val days = com.example.strivo.core.util.WeekDays.joinToString(",") { "'$it'" }
+        return readableDatabase.rawQuery(
+            "SELECT COUNT(DISTINCT planDay) FROM plans WHERE isDemo = 0 AND planDay IN ($days) AND planName != ?",
+            arrayOf(com.example.strivo.domain.model.EXTRA_PLAN_NAME),
+        ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+    }
+
     // --- Other activity (calories added by hand) ---
 
     fun insertActivity(entry: ExtraActivity, isDemo: Boolean = false): Long {
@@ -305,6 +335,21 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
                 db.update("exercises", values, "id = ? AND planId = ?", arrayOf(exerciseId.toString(), planId.toString()))
             }
             db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Adds a plan with its exercises (in this order) and the line for the activity log, all or nothing. Returns the plan's id. */
+    fun importPlan(plan: Plan, exercises: List<Exercise>, event: ActivityEvent): Long {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val planId = createPlan(plan)
+            exercises.forEachIndexed { position, exercise -> createExercise(exercise.copy(id = null, planId = planId, sortOrder = position)) }
+            insertEvent(event)
+            db.setTransactionSuccessful()
+            return planId
         } finally {
             db.endTransaction()
         }

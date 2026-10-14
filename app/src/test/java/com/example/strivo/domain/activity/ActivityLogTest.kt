@@ -11,6 +11,7 @@ import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.SetType
 import com.example.strivo.domain.model.WorkoutSession
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
@@ -61,9 +62,22 @@ class ActivityLogTest {
     }
 
     @Test
+    fun anOlderLineThatNamedTheFoodIsRewrittenWithoutIt() {
+        assertEquals("Logged dinner (560 kcal)", withoutFoodName("Logged \"Dal and rice\" (560 kcal) as dinner"))
+        assertEquals("Logged snack (90 kcal)", withoutFoodName("Logged \"Apple (green) \"fresh\"\" (90 kcal) as snack"))
+        // Lines that name no food are left alone.
+        assertNull(withoutFoodName("Logged dinner (560 kcal)"))
+        assertNull(withoutFoodName("Logged lunch (620 kcal, 41 g protein)"))
+        assertNull(withoutFoodName("Added \"Bench Press\" to Push Day (Monday)"))
+    }
+
+    @Test
     fun foodWeightAndActivityAreOneLineEach() {
         val food = FoodEntry(date = LocalDate.of(2026, 10, 13), meal = Meal.Dinner, name = "Dal and rice", calories = 560)
-        assertEquals("Logged \"Dal and rice\" (560 kcal) as dinner", foodLogged(food, at).summary)
+        // What was eaten is private: the line never names the food.
+        assertEquals("Logged dinner (560 kcal)", foodLogged(food, at).summary)
+        assertEquals("Logged dinner (560 kcal, 32 g protein)", foodLogged(food.copy(proteinG = 31.6), at).summary)
+        assertFalse(foodLogged(food, at).summary.contains("Dal"))
         assertEquals("Added activity \"Cycling\" (320 kcal, 45 min)", activityAdded(ExtraActivity(date = LocalDate.of(2026, 10, 13), name = "Cycling", calories = 320, minutes = 45), at).summary)
         assertEquals("Added activity \"Walk\" (130 kcal)", activityAdded(ExtraActivity(date = LocalDate.of(2026, 10, 13), name = "Walk", calories = 130), at).summary)
         assertEquals("Weighed in at 71 kg", weightLogged(71.0, at).summary)

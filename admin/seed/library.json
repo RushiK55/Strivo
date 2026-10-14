@@ -3,6 +3,13 @@
     "id": "bench-press",
     "name": "Bench Press",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front",
+      "triceps"
+    ],
     "equipment": "Barbell",
     "level": "Beginner",
     "instructions": "Lie on a flat bench with your feet on the floor. Lower the bar to the middle of your chest, then press it back up until your arms are straight.",
@@ -18,6 +25,13 @@
     "id": "incline-bench-press",
     "name": "Incline Bench Press",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest",
+      "delt-front"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Set the bench to a 30 to 45 degree angle. Lower the bar to your upper chest and press it back up.",
@@ -33,6 +47,13 @@
     "id": "dumbbell-bench-press",
     "name": "Dumbbell Bench Press",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front",
+      "triceps"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Lie on a flat bench holding a dumbbell in each hand over your chest. Lower them to the sides of your chest, then press them up.",
@@ -48,6 +69,13 @@
     "id": "incline-dumbbell-press",
     "name": "Incline Dumbbell Press",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest",
+      "delt-front"
+    ],
+    "secondaryMuscles": [
+      "triceps"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Sit on a bench set to a slight incline with dumbbells at your shoulders. Press them up and slightly together, then lower with control.",
@@ -63,6 +91,13 @@
     "id": "machine-chest-press",
     "name": "Machine Chest Press",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front",
+      "triceps"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Sit with your back against the pad and the handles at chest height. Press forward until your arms are straight, then return slowly.",
@@ -78,6 +113,12 @@
     "id": "chest-fly",
     "name": "Chest Fly",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front"
+    ],
     "equipment": "Dumbbells",
     "level": "Intermediate",
     "instructions": "Lie on a flat bench with dumbbells over your chest and a small bend in your elbows. Open your arms wide in an arc, then bring them back together.",
@@ -93,6 +134,13 @@
     "id": "cable-crossover",
     "name": "Cable Crossover",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front",
+      "serratus-anterior"
+    ],
     "equipment": "Cable",
     "level": "Intermediate",
     "instructions": "Stand between two high pulleys, step forward and lean slightly. Bring the handles down and together in front of your hips, then let them open slowly.",
@@ -108,6 +156,14 @@
     "id": "push-up",
     "name": "Push-Up",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "delt-front",
+      "abs"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Start in a plank with your hands under your shoulders. Lower your chest to just above the floor, then push back up with your body in a straight line.",
@@ -123,6 +179,13 @@
     "id": "chest-dip",
     "name": "Chest Dip",
     "muscleGroup": "Chest",
+    "primaryMuscles": [
+      "chest",
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "delt-front"
+    ],
     "equipment": "Bodyweight",
     "level": "Advanced",
     "instructions": "Hold yourself on parallel bars with your arms straight. Lean forward, lower until your upper arms are about level with the floor, then push back up.",
@@ -138,6 +201,18 @@
     "id": "deadlift",
     "name": "Deadlift",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "erector-spinae",
+      "glutes",
+      "hamstrings"
+    ],
+    "secondaryMuscles": [
+      "traps",
+      "lats",
+      "quadriceps",
+      "forearm-flexors",
+      "adductors"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Stand with the bar over your mid-foot. Hinge at the hips, grip the bar and stand up by pushing the floor away, keeping the bar close to your legs. Lower it the same way.",
@@ -153,6 +228,16 @@
     "id": "barbell-row",
     "name": "Barbell Row",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "lats",
+      "mid-back"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "delt-rear",
+      "erector-spinae",
+      "traps"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Hinge forward with a flat back holding the bar. Pull it to your lower ribs, squeeze your shoulder blades, then lower it with control.",
@@ -168,6 +253,15 @@
     "id": "pull-up",
     "name": "Pull-Up",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "lats"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "mid-back",
+      "forearm-flexors",
+      "delt-rear"
+    ],
     "equipment": "Bodyweight",
     "level": "Intermediate",
     "instructions": "Hang from a bar with an overhand grip a little wider than your shoulders. Pull until your chin is over the bar, then lower fully.",
@@ -183,6 +277,14 @@
     "id": "chin-up",
     "name": "Chin-Up",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "lats",
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "mid-back",
+      "forearm-flexors"
+    ],
     "equipment": "Bodyweight",
     "level": "Intermediate",
     "instructions": "Hang from a bar with an underhand, shoulder-width grip. Pull your chin over the bar, then lower slowly.",
@@ -198,6 +300,14 @@
     "id": "lat-pulldown",
     "name": "Lat Pulldown",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "lats"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "mid-back",
+      "delt-rear"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Sit with your thighs under the pad and grip the bar wider than your shoulders. Pull it to your upper chest, then let it rise slowly.",
@@ -213,6 +323,15 @@
     "id": "seated-cable-row",
     "name": "Seated Cable Row",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "mid-back",
+      "lats"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "delt-rear",
+      "erector-spinae"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Sit with your knees slightly bent and a tall chest. Pull the handle to your stomach, squeeze your shoulder blades together, then return slowly.",
@@ -228,6 +347,14 @@
     "id": "one-arm-dumbbell-row",
     "name": "One-Arm Dumbbell Row",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "lats"
+    ],
+    "secondaryMuscles": [
+      "mid-back",
+      "biceps",
+      "delt-rear"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Rest one hand and knee on a bench. Pull the dumbbell from the floor to your hip, then lower it fully.",
@@ -243,6 +370,15 @@
     "id": "t-bar-row",
     "name": "T-Bar Row",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "mid-back",
+      "lats"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "delt-rear",
+      "erector-spinae"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Straddle the bar and hinge forward with a flat back. Pull the handle to your chest, then lower it with control.",
@@ -258,6 +394,14 @@
     "id": "face-pull",
     "name": "Face Pull",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "delt-rear",
+      "mid-back"
+    ],
+    "secondaryMuscles": [
+      "rotator-cuff",
+      "traps"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Set a rope at face height. Pull it towards your face, with your hands ending beside your ears and elbows high, then return slowly.",
@@ -273,6 +417,14 @@
     "id": "back-extension",
     "name": "Back Extension",
     "muscleGroup": "Back",
+    "primaryMuscles": [
+      "erector-spinae"
+    ],
+    "secondaryMuscles": [
+      "glutes",
+      "hamstrings",
+      "multifidus"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "On a back extension bench with your hips at the pad, lower your torso, then raise it until your body is in a straight line.",
@@ -288,6 +440,15 @@
     "id": "overhead-press",
     "name": "Overhead Press",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-front",
+      "delt-side"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "traps",
+      "serratus-anterior"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Stand with the bar at your collarbone. Press it straight overhead as your head moves slightly forward, then lower it back to your shoulders.",
@@ -303,6 +464,14 @@
     "id": "dumbbell-shoulder-press",
     "name": "Dumbbell Shoulder Press",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-front",
+      "delt-side"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "traps"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Sit with dumbbells at shoulder height, palms forward. Press them overhead until your arms are straight, then lower with control.",
@@ -318,6 +487,14 @@
     "id": "arnold-press",
     "name": "Arnold Press",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-front",
+      "delt-side"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "delt-rear"
+    ],
     "equipment": "Dumbbells",
     "level": "Intermediate",
     "instructions": "Start with dumbbells in front of your chest, palms facing you. Rotate your palms outward as you press overhead, then reverse on the way down.",
@@ -333,6 +510,13 @@
     "id": "lateral-raise",
     "name": "Lateral Raise",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-side"
+    ],
+    "secondaryMuscles": [
+      "traps",
+      "rotator-cuff"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Stand holding dumbbells at your sides. Raise your arms out to the sides until they reach shoulder height, then lower slowly.",
@@ -348,6 +532,13 @@
     "id": "front-raise",
     "name": "Front Raise",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-front"
+    ],
+    "secondaryMuscles": [
+      "chest",
+      "delt-side"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hold dumbbells in front of your thighs. Raise one or both arms straight in front of you to shoulder height, then lower slowly.",
@@ -363,6 +554,14 @@
     "id": "rear-delt-fly",
     "name": "Rear Delt Fly",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-rear"
+    ],
+    "secondaryMuscles": [
+      "mid-back",
+      "traps",
+      "rotator-cuff"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hinge forward with dumbbells hanging below you. Raise your arms out to the sides until they are level with your back, then lower slowly.",
@@ -378,6 +577,14 @@
     "id": "upright-row",
     "name": "Upright Row",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "delt-side",
+      "traps"
+    ],
+    "secondaryMuscles": [
+      "biceps",
+      "delt-front"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Hold a bar in front of your thighs with a grip slightly narrower than your shoulders. Pull it up to your chest with your elbows leading, then lower.",
@@ -393,6 +600,13 @@
     "id": "shrug",
     "name": "Shrug",
     "muscleGroup": "Shoulders",
+    "primaryMuscles": [
+      "traps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors",
+      "neck"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hold heavy dumbbells at your sides. Lift your shoulders straight up towards your ears, pause, then lower.",
@@ -408,6 +622,12 @@
     "id": "barbell-curl",
     "name": "Barbell Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Barbell",
     "level": "Beginner",
     "instructions": "Stand holding a bar with an underhand grip. Curl it up to your chest keeping your elbows by your sides, then lower slowly.",
@@ -423,6 +643,12 @@
     "id": "dumbbell-curl",
     "name": "Dumbbell Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Stand with a dumbbell in each hand. Curl them up, turning your palms up as you lift, then lower with control.",
@@ -438,6 +664,13 @@
     "id": "hammer-curl",
     "name": "Hammer Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps",
+      "forearm-extensors"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hold dumbbells with your palms facing each other. Curl them up without turning your wrists, then lower slowly.",
@@ -453,6 +686,12 @@
     "id": "preacher-curl",
     "name": "Preacher Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Rest your upper arms on the preacher pad. Curl the bar up, then lower it until your arms are almost straight.",
@@ -468,6 +707,12 @@
     "id": "incline-dumbbell-curl",
     "name": "Incline Dumbbell Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Dumbbells",
     "level": "Intermediate",
     "instructions": "Sit back on an incline bench with your arms hanging. Curl the dumbbells up, then lower fully to stretch the biceps.",
@@ -483,6 +728,12 @@
     "id": "cable-curl",
     "name": "Cable Curl",
     "muscleGroup": "Biceps",
+    "primaryMuscles": [
+      "biceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Stand facing a low pulley with a straight bar. Curl it up with your elbows still, then lower slowly.",
@@ -498,6 +749,12 @@
     "id": "tricep-pushdown",
     "name": "Tricep Pushdown",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Stand at a high pulley with an overhand grip. Keep your elbows by your sides and push the bar down until your arms are straight, then let it rise.",
@@ -513,6 +770,12 @@
     "id": "skull-crusher",
     "name": "Skull Crusher",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "delt-front"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Lie on a bench with a bar over your chest. Bend your elbows to lower it towards your forehead, then extend your arms.",
@@ -528,6 +791,12 @@
     "id": "overhead-tricep-extension",
     "name": "Overhead Tricep Extension",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "rotator-cuff"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hold one dumbbell overhead with both hands. Lower it behind your head by bending your elbows, then extend your arms.",
@@ -543,6 +812,13 @@
     "id": "close-grip-bench-press",
     "name": "Close-Grip Bench Press",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps",
+      "chest"
+    ],
+    "secondaryMuscles": [
+      "delt-front"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Lie on a bench and grip the bar with your hands about shoulder width apart. Lower it to your lower chest and press up.",
@@ -558,6 +834,13 @@
     "id": "bench-dip",
     "name": "Bench Dip",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "chest",
+      "delt-front"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Sit on the edge of a bench with your hands beside your hips and your legs out. Slide forward and lower your body by bending your elbows, then push back up.",
@@ -573,6 +856,12 @@
     "id": "tricep-kickback",
     "name": "Tricep Kickback",
     "muscleGroup": "Triceps",
+    "primaryMuscles": [
+      "triceps"
+    ],
+    "secondaryMuscles": [
+      "delt-rear"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hinge forward with your upper arm parallel to the floor. Extend your forearm back until your arm is straight, then return.",
@@ -588,6 +877,16 @@
     "id": "squat",
     "name": "Squat",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "adductors",
+      "erector-spinae",
+      "abs"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Place the bar across your upper back. Sit down and back until your thighs are at least parallel to the floor, then stand up.",
@@ -603,6 +902,15 @@
     "id": "front-squat",
     "name": "Front Squat",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "glutes",
+      "adductors",
+      "abs",
+      "erector-spinae"
+    ],
     "equipment": "Barbell",
     "level": "Advanced",
     "instructions": "Rest the bar on the front of your shoulders with your elbows high. Squat down keeping your torso upright, then stand.",
@@ -618,6 +926,14 @@
     "id": "goblet-squat",
     "name": "Goblet Squat",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "adductors",
+      "abs"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Hold one dumbbell at your chest. Squat down between your knees, then stand back up.",
@@ -633,6 +949,14 @@
     "id": "leg-press",
     "name": "Leg Press",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "glutes",
+      "adductors",
+      "hamstrings"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Sit in the machine with your feet shoulder width apart on the platform. Lower the platform until your knees are at about 90 degrees, then press it away.",
@@ -648,6 +972,12 @@
     "id": "hack-squat",
     "name": "Hack Squat",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "glutes"
+    ],
     "equipment": "Machine",
     "level": "Intermediate",
     "instructions": "Stand on the platform with your back on the pad. Lower until your thighs are parallel to it, then push back up.",
@@ -663,6 +993,15 @@
     "id": "lunge",
     "name": "Lunge",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "adductors",
+      "calves"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Step forward and lower your back knee towards the floor. Push through your front foot to return to standing, then switch legs.",
@@ -678,6 +1017,14 @@
     "id": "bulgarian-split-squat",
     "name": "Bulgarian Split Squat",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "adductors"
+    ],
     "equipment": "Dumbbells",
     "level": "Intermediate",
     "instructions": "Rest your back foot on a bench behind you. Lower your back knee towards the floor, then stand up on your front leg.",
@@ -693,6 +1040,14 @@
     "id": "step-up",
     "name": "Step-Up",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "calves"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Place one foot on a bench or box. Push through that foot to stand on top, then step back down with control.",
@@ -708,6 +1063,14 @@
     "id": "romanian-deadlift",
     "name": "Romanian Deadlift",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "hamstrings",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "erector-spinae",
+      "forearm-flexors"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Stand holding a bar at your thighs. Push your hips back, lowering the bar down your legs until you feel a stretch behind your thighs, then stand up.",
@@ -723,6 +1086,10 @@
     "id": "leg-extension",
     "name": "Leg Extension",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "quadriceps"
+    ],
+    "secondaryMuscles": [],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Sit with the pad on your lower shins. Straighten your legs, pause, then lower slowly.",
@@ -738,6 +1105,12 @@
     "id": "leg-curl",
     "name": "Leg Curl",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "hamstrings"
+    ],
+    "secondaryMuscles": [
+      "calves"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Lie or sit in the machine with the pad above your heels. Bend your knees to curl the pad towards you, then return slowly.",
@@ -753,6 +1126,10 @@
     "id": "calf-raise",
     "name": "Calf Raise",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "calves"
+    ],
+    "secondaryMuscles": [],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Stand with the balls of your feet on a step and the weight on your shoulders. Rise onto your toes, pause, then lower below the step.",
@@ -768,6 +1145,10 @@
     "id": "seated-calf-raise",
     "name": "Seated Calf Raise",
     "muscleGroup": "Legs",
+    "primaryMuscles": [
+      "calves"
+    ],
+    "secondaryMuscles": [],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Sit with the pad on your thighs and the balls of your feet on the platform. Raise your heels, pause, then lower fully.",
@@ -783,6 +1164,14 @@
     "id": "hip-thrust",
     "name": "Hip Thrust",
     "muscleGroup": "Glutes",
+    "primaryMuscles": [
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "adductors",
+      "quadriceps"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Sit with your upper back against a bench and a bar across your hips. Drive your hips up until your body is in a straight line, squeeze, then lower.",
@@ -798,6 +1187,13 @@
     "id": "glute-bridge",
     "name": "Glute Bridge",
     "muscleGroup": "Glutes",
+    "primaryMuscles": [
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "abs"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Lie on your back with your knees bent. Push through your heels to lift your hips until your body is straight, then lower.",
@@ -813,6 +1209,13 @@
     "id": "cable-kickback",
     "name": "Cable Kickback",
     "muscleGroup": "Glutes",
+    "primaryMuscles": [
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "glute-med"
+    ],
     "equipment": "Cable",
     "level": "Beginner",
     "instructions": "Attach a strap to your ankle at a low pulley. Kick your leg straight back, squeeze, then return slowly.",
@@ -828,6 +1231,16 @@
     "id": "sumo-deadlift",
     "name": "Sumo Deadlift",
     "muscleGroup": "Glutes",
+    "primaryMuscles": [
+      "glutes",
+      "adductors",
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "erector-spinae",
+      "traps"
+    ],
     "equipment": "Barbell",
     "level": "Intermediate",
     "instructions": "Stand with a wide stance and toes turned out, gripping the bar inside your knees. Stand up by pushing the floor apart, then lower with control.",
@@ -843,6 +1256,15 @@
     "id": "plank",
     "name": "Plank",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs",
+      "transverse-abdominis"
+    ],
+    "secondaryMuscles": [
+      "obliques",
+      "delt-front",
+      "glutes"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Rest on your forearms and toes with your body in a straight line. Hold the position with your core tight.",
@@ -858,6 +1280,14 @@
     "id": "side-plank",
     "name": "Side Plank",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "obliques",
+      "quadratus-lumborum"
+    ],
+    "secondaryMuscles": [
+      "transverse-abdominis",
+      "glute-med"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Lie on your side and prop yourself on your forearm. Lift your hips so your body is in a straight line and hold.",
@@ -873,6 +1303,10 @@
     "id": "crunch",
     "name": "Crunch",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs"
+    ],
+    "secondaryMuscles": [],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Lie on your back with your knees bent. Curl your shoulders off the floor towards your hips, then lower slowly.",
@@ -888,6 +1322,13 @@
     "id": "bicycle-crunch",
     "name": "Bicycle Crunch",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs",
+      "obliques"
+    ],
+    "secondaryMuscles": [
+      "hip-flexors"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Lie on your back with your hands by your head. Bring one elbow towards the opposite knee as you straighten the other leg, then switch.",
@@ -903,6 +1344,14 @@
     "id": "hanging-leg-raise",
     "name": "Hanging Leg Raise",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs",
+      "hip-flexors"
+    ],
+    "secondaryMuscles": [
+      "forearm-flexors",
+      "obliques"
+    ],
     "equipment": "Bodyweight",
     "level": "Intermediate",
     "instructions": "Hang from a bar. Raise your legs straight up in front of you, then lower them slowly without swinging.",
@@ -918,6 +1367,14 @@
     "id": "russian-twist",
     "name": "Russian Twist",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "obliques",
+      "abs"
+    ],
+    "secondaryMuscles": [
+      "hip-flexors",
+      "internal-oblique"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Sit leaning back slightly with your feet off the floor. Rotate your torso from side to side, touching the floor beside you.",
@@ -933,6 +1390,12 @@
     "id": "cable-crunch",
     "name": "Cable Crunch",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs"
+    ],
+    "secondaryMuscles": [
+      "obliques"
+    ],
     "equipment": "Cable",
     "level": "Intermediate",
     "instructions": "Kneel below a high pulley holding the rope at your head. Curl your torso down, bringing your elbows towards your knees, then return slowly.",
@@ -948,6 +1411,15 @@
     "id": "ab-wheel-rollout",
     "name": "Ab Wheel Rollout",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs",
+      "transverse-abdominis"
+    ],
+    "secondaryMuscles": [
+      "lats",
+      "delt-front",
+      "serratus-anterior"
+    ],
     "equipment": "Equipment",
     "level": "Advanced",
     "instructions": "Kneel holding an ab wheel under your shoulders. Roll forward as far as you can keep your back flat, then pull back.",
@@ -963,6 +1435,15 @@
     "id": "mountain-climber",
     "name": "Mountain Climber",
     "muscleGroup": "Core",
+    "primaryMuscles": [
+      "abs",
+      "hip-flexors"
+    ],
+    "secondaryMuscles": [
+      "delt-front",
+      "chest",
+      "quadriceps"
+    ],
     "equipment": "Bodyweight",
     "level": "Beginner",
     "instructions": "Start in a push-up position. Drive one knee towards your chest, then switch legs quickly.",
@@ -978,6 +1459,16 @@
     "id": "treadmill-run",
     "name": "Treadmill Run",
     "muscleGroup": "Cardio",
+    "primaryMuscles": [
+      "quadriceps",
+      "hamstrings",
+      "calves"
+    ],
+    "secondaryMuscles": [
+      "glutes",
+      "hip-flexors",
+      "shins"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Run or walk at a pace you can keep up. Warm up for a few minutes first and cool down at the end.",
@@ -993,6 +1484,16 @@
     "id": "rowing-machine",
     "name": "Rowing Machine",
     "muscleGroup": "Cardio",
+    "primaryMuscles": [
+      "lats",
+      "mid-back",
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "biceps",
+      "erector-spinae"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Push with your legs first, then lean back and pull the handle to your lower ribs. Return in the reverse order.",
@@ -1008,6 +1509,14 @@
     "id": "cycling",
     "name": "Cycling",
     "muscleGroup": "Cardio",
+    "primaryMuscles": [
+      "quadriceps",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "hamstrings",
+      "calves"
+    ],
     "equipment": "Machine",
     "level": "Beginner",
     "instructions": "Pedal at a steady effort on a stationary bike or outdoors. Adjust the seat so your knee is slightly bent at the bottom.",
@@ -1023,6 +1532,13 @@
     "id": "jump-rope",
     "name": "Jump Rope",
     "muscleGroup": "Cardio",
+    "primaryMuscles": [
+      "calves"
+    ],
+    "secondaryMuscles": [
+      "shins",
+      "quadriceps"
+    ],
     "equipment": "Equipment",
     "level": "Beginner",
     "instructions": "Turn the rope with your wrists and jump just high enough to clear it, landing softly on the balls of your feet.",
@@ -1038,6 +1554,16 @@
     "id": "burpee",
     "name": "Burpee",
     "muscleGroup": "Cardio",
+    "primaryMuscles": [
+      "chest",
+      "quadriceps"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "delt-front",
+      "abs",
+      "glutes"
+    ],
     "equipment": "Bodyweight",
     "level": "Intermediate",
     "instructions": "From standing, drop to a push-up position, do a push-up, jump your feet back in and jump up with your arms overhead.",
@@ -1053,6 +1579,16 @@
     "id": "kettlebell-swing",
     "name": "Kettlebell Swing",
     "muscleGroup": "Full body",
+    "primaryMuscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "secondaryMuscles": [
+      "erector-spinae",
+      "abs",
+      "delt-front",
+      "forearm-flexors"
+    ],
     "equipment": "Kettlebell",
     "level": "Intermediate",
     "instructions": "Hinge at the hips with the kettlebell between your legs. Snap your hips forward to swing it to chest height, then let it swing back.",
@@ -1068,6 +1604,17 @@
     "id": "clean-and-press",
     "name": "Clean and Press",
     "muscleGroup": "Full body",
+    "primaryMuscles": [
+      "glutes",
+      "delt-front",
+      "traps"
+    ],
+    "secondaryMuscles": [
+      "quadriceps",
+      "hamstrings",
+      "triceps",
+      "erector-spinae"
+    ],
     "equipment": "Barbell",
     "level": "Advanced",
     "instructions": "Pull the bar from the floor to your shoulders in one movement, then press it overhead. Lower it back to your shoulders and to the floor.",
@@ -1083,6 +1630,15 @@
     "id": "thruster",
     "name": "Thruster",
     "muscleGroup": "Full body",
+    "primaryMuscles": [
+      "quadriceps",
+      "delt-front",
+      "glutes"
+    ],
+    "secondaryMuscles": [
+      "triceps",
+      "abs"
+    ],
     "equipment": "Dumbbells",
     "level": "Intermediate",
     "instructions": "Hold dumbbells at your shoulders. Squat down, and as you stand up press the weights overhead in one smooth movement.",
@@ -1098,6 +1654,16 @@
     "id": "farmer-s-walk",
     "name": "Farmer's Walk",
     "muscleGroup": "Full body",
+    "primaryMuscles": [
+      "forearm-flexors",
+      "traps"
+    ],
+    "secondaryMuscles": [
+      "abs",
+      "obliques",
+      "glutes",
+      "quadratus-lumborum"
+    ],
     "equipment": "Dumbbells",
     "level": "Beginner",
     "instructions": "Pick up a heavy dumbbell in each hand and walk with tall posture and short steps for about 30 metres.",

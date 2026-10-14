@@ -95,6 +95,7 @@ fun HomeScreen(
 
     val auth by authViewModel.state.collectAsStateWithLifecycle()
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
+    val fromTrainer by planViewModel.received.collectAsStateWithLifecycle()
     val groupedPlans = remember(plans) { plans.groupedByDay() }
     val plansForDay = groupedPlans[selectedDay].orEmpty()
 
@@ -202,6 +203,22 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f),
                     )
                 }
+            }
+        }
+
+        // Plans the trainer just sent
+        if (fromTrainer.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(16.dp))
+                TrainerPlansCard(
+                    plans = fromTrainer,
+                    onOpen = { received ->
+                        // The user may have deleted it since; then there is nothing to open and the note goes.
+                        val plan = plans.firstOrNull { it.planId == received.planId }
+                        if (plan != null) onOpenPlan(plan) else planViewModel.dismissReceived(received.id)
+                    },
+                    onDismiss = { planViewModel.dismissReceived(it.id) },
+                )
             }
         }
 

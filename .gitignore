@@ -36,6 +36,7 @@ admin/.env.local
 admin/.next/
 admin/out/
 admin/.test-build/
+admin/public/models/
 admin/next-env.d.ts
 admin/*.tsbuildinfo
 firestore-debug.log

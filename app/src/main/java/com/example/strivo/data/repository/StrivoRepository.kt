@@ -29,6 +29,8 @@ import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
+import com.example.strivo.domain.plan.ReceivedPlan
+import com.example.strivo.domain.plan.toShow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -94,6 +96,11 @@ class StrivoRepository(
         record(planCopied(source, day, now()))
         newId
     }
+
+    /** Plans the trainer sent that the Home screen should mention: recent ones the user has not dismissed. */
+    suspend fun receivedPlans(): List<ReceivedPlan> = io { prefs.getReceivedPlans().toShow(now()) }
+
+    suspend fun dismissReceivedPlan(id: String) = io { prefs.dismissReceivedPlan(id) }
 
     // --- Exercises ---
 

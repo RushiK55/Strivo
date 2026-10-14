@@ -1,6 +1,8 @@
 package com.example.strivo.data.local.db
 
 import android.database.sqlite.SQLiteDatabase
+import com.example.strivo.domain.activity.ActivityKind
+import com.example.strivo.domain.activity.withoutFoodName
 
 /**
  * The tables of the app database: how they are created, and how a database made by an older version is brought up to
@@ -8,7 +10,7 @@ import android.database.sqlite.SQLiteDatabase
  */
 internal object Schema {
     /** Bump when a table changes, and add a step for it to [upgrade]. */
-    const val VERSION = 16
+    const val VERSION = 17
 
     /** The tables demo data writes to, which carry the isDemo mark. */
     val DemoTables = listOf("workout_sessions", "exercises", "plans", "food_log", "activity_log", "weight_log")
@@ -197,6 +199,16 @@ internal object Schema {
         if (oldVersion < 15) addDemoColumns(db)
         // The sync step above only ran for databases older than 12; this adds the triggers for the activity table.
         if (oldVersion in 12..15) createSyncObjects(db)
+        // The activity lines an older version wrote with a food's name in them are rewritten without it (and uploaded again
+        // by the sync, which sees the updates), because the trainer's dashboard may read those lines but not what was eaten.
+        if (oldVersion < 17) removeFoodNamesFromEvents(db)
+    }
+
+    private fun removeFoodNamesFromEvents(db: SQLiteDatabase) {
+        val rewrites = db.rawQuery("SELECT id, summary FROM activity_events WHERE type = ?", arrayOf(ActivityKind.FoodLogged)).use { c ->
+            buildList { while (c.moveToNext()) withoutFoodName(c.getString(1))?.let { add(c.getLong(0) to it) } }
+        }
+        rewrites.forEach { (id, summary) -> db.execSQL("UPDATE activity_events SET summary = ? WHERE id = ?", arrayOf<Any>(summary, id)) }
     }
 
     /**

@@ -1,11 +1,12 @@
-// Every Firestore read and write the dashboard makes. The admin only ever WRITES to the library and to the admins list;
-// users' own data is read-only to an admin (firestore.rules enforces this, not just this code).
+// Every Firestore read and write the dashboard makes. The admin only ever WRITES to the library, the admins list and the
+// plans it sends a client (users/{uid}/assigned); the rest of a client's data is read-only to an admin (firestore.rules
+// enforces this, not just this code).
 import {
-  collection, collectionGroup, deleteDoc, doc, getCountFromServer, getDoc, getDocs, limit, orderBy, query, setDoc, startAfter,
+  addDoc, collection, collectionGroup, deleteDoc, doc, getCountFromServer, getDoc, getDocs, limit, orderBy, query, setDoc, startAfter,
   where, writeBatch, type DocumentData, type OrderByDirection, type QueryDocumentSnapshot, type Query,
 } from 'firebase/firestore';
 import { getFirebase } from './firebase';
-import type { ActivityEvent, AdminEntry, LibraryExercise, LibraryFields, ProfileDoc, UserSummary } from './types';
+import type { ActivityEvent, AdminEntry, Assignment, AssignmentFields, ClientWorkout, LibraryExercise, LibraryFields, NutritionDay, ProfileDoc, UserSummary } from './types';
 
 const PAGE = 50;
 
@@ -115,6 +116,21 @@ export async function deleteLibraryExercise(id: string): Promise<void> {
   await deleteDoc(doc(db(), 'library', id));
 }
 
+/** Sets the muscles of library exercises (and nothing else of them), in batches. Returns how many were written. */
+export async function setLibraryMuscles(updates: { id: string; primaryMuscles: string[]; secondaryMuscles: string[] }[], adminUid: string): Promise<number> {
+  const now = Date.now();
+  let written = 0;
+  for (let i = 0; i < updates.length; i += 400) {
+    const batch = writeBatch(db());
+    for (const { id, ...muscles } of updates.slice(i, i + 400)) {
+      batch.set(doc(db(), 'library', id), { ...muscles, updatedAt: now, updatedBy: adminUid }, { merge: true });
+      written += 1;
+    }
+    await batch.commit();
+  }
+  return written;
+}
+
 /** Writes the given exercises in batches (Firestore allows 500 writes per batch). Returns how many were written. */
 export async function importLibrary(exercises: (LibraryFields & { id: string })[], adminUid: string): Promise<number> {
   const now = Date.now();
@@ -128,4 +144,41 @@ export async function importLibrary(exercises: (LibraryFields & { id: string })[
     await batch.commit();
   }
   return written;
+}
+
+// ---- Plans sent to a client ----
+
+/** The plans trainers sent this client, newest first. */
+export async function listAssignments(uid: string, max = 50): Promise<Assignment[]> {
+  const snap = await getDocs(query(collection(db(), 'users', uid, 'assigned'), orderBy('sentAt', 'desc'), limit(max)));
+  return snap.docs.map((d) => withId<Assignment>(d));
+}
+
+/** Sends a plan. The client's app adds it to their plans on its next sync. */
+export async function sendAssignment(uid: string, value: AssignmentFields, adminUid: string): Promise<void> {
+  await addDoc(collection(db(), 'users', uid, 'assigned'), { ...value, status: 'sent', sentAt: Date.now(), sentBy: adminUid });
+}
+
+/** Takes a plan back; the rules only allow it while the app has not picked it up. */
+export async function withdrawAssignment(uid: string, id: string): Promise<void> {
+  await deleteDoc(doc(db(), 'users', uid, 'assigned', id));
+}
+
+// ---- Training and intake (what a trainer coaches from) ----
+
+/**
+ * Every client's finished workouts since a date (YYYY-MM-DD), newest first, with the client each belongs to.
+ * Demo workouts are left out. One query (a collection group query), so the attendance page does not read client by client.
+ */
+export async function listWorkoutsSince(date: string, max = 1000): Promise<ClientWorkout[]> {
+  const snap = await getDocs(query(collectionGroup(db(), 'sessions'), where('date', '>=', date), orderBy('date', 'desc'), limit(max)));
+  return snap.docs
+    .map((d) => ({ ...d.data(), id: d.id, uid: d.ref.parent.parent?.id ?? '' }) as ClientWorkout)
+    .filter((workout) => !workout.isDemo);
+}
+
+/** One client's daily calorie and protein totals, newest first. There is no way to read what was eaten. */
+export async function listNutrition(uid: string, max = 90): Promise<NutritionDay[]> {
+  const snap = await getDocs(query(collection(db(), 'users', uid, 'nutrition'), orderBy('date', 'desc'), limit(max)));
+  return snap.docs.map((d) => withId<NutritionDay>(d));
 }

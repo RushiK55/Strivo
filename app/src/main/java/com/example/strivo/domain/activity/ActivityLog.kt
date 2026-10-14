@@ -7,7 +7,9 @@ import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.isWork
+import com.example.strivo.domain.plan.PlanAssignment
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /*
  * The activity log: one line for each thing a user does that an admin may want to see, written in plain words.
@@ -19,6 +21,7 @@ object ActivityKind {
     const val PlanCreated = "plan_created"
     const val PlanDeleted = "plan_deleted"
     const val PlanCopied = "plan_copied"
+    const val PlanAssigned = "plan_assigned"
     const val ExerciseAdded = "exercise_added"
     const val ExerciseEdited = "exercise_edited"
     const val ExerciseRemoved = "exercise_removed"
@@ -49,6 +52,17 @@ fun planDeleted(plan: Plan, at: Long) =
 
 fun planCopied(source: Plan, day: String, at: Long) =
     ActivityEvent(at = at, type = ActivityKind.PlanCopied, summary = "Added plan \"${source.planName}\" to $day")
+
+/** "Got plan "Push Day" (Monday) from Coach Raj · 5 exercises" */
+fun planAssigned(assignment: PlanAssignment, at: Long): ActivityEvent {
+    val from = assignment.trainerName.ifEmpty { "their trainer" }
+    val count = assignment.exercises.size
+    return ActivityEvent(
+        at = at,
+        type = ActivityKind.PlanAssigned,
+        summary = "Got plan ${planLabel("\"${assignment.planName}\"", assignment.day)} from $from · ${if (count == 1) "1 exercise" else "$count exercises"}",
+    )
+}
 
 private fun target(exercise: Exercise): String {
     val weight = exercise.weight.toDoubleOrNull() ?: 0.0
@@ -98,10 +112,20 @@ internal fun minutes(clock: String): Int? {
     return (seconds / 60).takeIf { it > 0 }
 }
 
+private val OldFoodLine = Regex("""(?s)^Logged ".*" \((\d+) kcal\) as (\w+)$""")
+
+/**
+ * Older versions wrote the food's name into the line ("Logged "Dal and rice" (560 kcal) as dinner"). Returns that line
+ * without the name, or null when [summary] is not such a line (and needs no change).
+ */
+fun withoutFoodName(summary: String): String? =
+    OldFoodLine.find(summary)?.let { "Logged ${it.groupValues[2]} (${it.groupValues[1]} kcal)" }
+
+/** What was eaten is private: the line says which meal and how much, never the food. */
 fun foodLogged(entry: FoodEntry, at: Long) = ActivityEvent(
     at = at,
     type = ActivityKind.FoodLogged,
-    summary = "Logged \"${entry.name}\" (${entry.calories} kcal) as ${entry.meal.label.lowercase()}",
+    summary = "Logged ${entry.meal.label.lowercase()} (${entry.calories} kcal${entry.proteinG?.let { ", ${it.roundToInt()} g protein" }.orEmpty()})",
 )
 
 fun activityAdded(entry: ExtraActivity, at: Long) = ActivityEvent(

@@ -1,0 +1,14 @@
+{
+  "name": "strivo-anatomy-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Builds the optimized male and female anatomy models (models/anatomy) from the Human-Atlas, female-atlas and Z-Anatomy data.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test groups.test.mjs warp.test.mjs shell.test.mjs"
+  },
+  "dependencies": {
+    "meshoptimizer": "^1.3.0"
+  }
+}
