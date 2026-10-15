@@ -63,7 +63,7 @@ import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.plan.isPlanDoneToday
 import com.example.strivo.feature.auth.AuthViewModel
-import com.example.strivo.feature.body.BodyViewModel
+import com.example.strivo.feature.body.BodyEdgeHandle
 import com.example.strivo.feature.coach.AdviceCard
 import com.example.strivo.feature.plans.ExerciseViewModel
 import com.example.strivo.feature.plans.ExtraExerciseSheet
@@ -98,10 +98,6 @@ fun HomeScreen(
 
     val auth by authViewModel.state.collectAsStateWithLifecycle()
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
-    // Today's muscles for the card that opens the 3D body (no model here: only the words).
-    val bodyViewModel: BodyViewModel = androidx.lifecycle.viewmodel.compose.viewModel(key = "home_body")
-    val todayBody by bodyViewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(plans) { bodyViewModel.load(withModel = false) } // again when the plans change
     val offers by planViewModel.offers.collectAsStateWithLifecycle()
     val notice by planViewModel.notice.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -157,196 +153,193 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppColors.Background)
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
-    ) {
-        // Greeting
-        item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")).uppercase(),
-                        style = AppType.Overline,
-                        color = AppColors.TextSecondary,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Hello, ${auth.userName?.split(' ')?.first() ?: "there"}",
-                        style = AppType.LargeTitle,
-                        color = AppColors.TextPrimary,
-                        maxLines = 1,
-                    )
-                }
-                IconButton(onClick = onOpenLibrary) {
-                    Icon(Icons.Rounded.MenuBook, contentDescription = "Exercise library", tint = AppColors.TextSecondary)
-                }
-                Avatar(name = auth.userName)
-            }
-        }
-
-        // The week at a glance
-        item {
-            val weekStart = currentWeek.first()
-            val weekEnd = currentWeek.last()
-            val todaysPlans = groupedPlans[dayName(today.dayOfWeek)].orEmpty()
-            val doneToday = todaysPlans.count { isCompletedOn(it, today) }
-            Spacer(Modifier.height(20.dp))
-            AppCard(padding = PaddingValues(vertical = 16.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    SummaryStat(
-                        value = currentStreak(sessions, today, profileState.profile.restDays).toString(),
-                        label = "Day streak",
-                        accentIcon = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatDivider()
-                    SummaryStat(
-                        value = sessions.count { it.date.toLocalDate() in weekStart..weekEnd }.toString(),
-                        label = "Workouts this week",
-                        modifier = Modifier.weight(1f),
-                    )
-                    StatDivider()
-                    SummaryStat(
-                        value = if (todaysPlans.isEmpty()) "Rest" else "$doneToday/${todaysPlans.size}",
-                        label = if (todaysPlans.isEmpty()) "Today" else "Done today",
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-
-        // Plans the trainer sent that are waiting for an answer: one card for a week's worth, with Accept and Decline
-        if (offers.isNotEmpty()) {
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(AppColors.Background)
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
+        ) {
+            // Greeting
             item {
-                Spacer(Modifier.height(16.dp))
-                TrainerOffersCard(offers = offers, onAccept = planViewModel::acceptOffer, onDecline = planViewModel::declineOffer)
-            }
-        }
-
-        // Which muscles today works, and the way into the 3D body where they glow
-        item {
-            Spacer(Modifier.height(16.dp))
-            TodayBodyCard(state = todayBody, onOpen = onOpenBody)
-        }
-
-        // Week strip
-        item {
-            Spacer(Modifier.height(16.dp))
-            WeekStrip(
-                week = currentWeek,
-                today = today,
-                selectedDay = selectedDay,
-                dayStatus = { date -> dayStatus(date, groupedPlans[dayName(date.dayOfWeek)].orEmpty(), sessions) },
-                onSelect = { day ->
-                    selectedDay = day
-                    exerciseViewModel.loadExercisesByDay(day)
-                },
-            )
-        }
-
-        // The selected day's plans
-        item {
-            val done = plansForDay.count { isCompleted(it) }
-            Spacer(Modifier.height(28.dp))
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    AccentTitle(if (selectedDate == today) "Today" else selectedDay, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    if (plansForDay.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            "$done of ${plansForDay.size} done",
-                            style = AppType.Caption,
-                            color = if (done == plansForDay.size) AppColors.Accent else AppColors.TextSecondary,
+                            text = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")).uppercase(),
+                            style = AppType.Overline,
+                            color = AppColors.TextSecondary,
                         )
-                    }
-                }
-                Row(
-                    modifier = Modifier
-                        .clip(AppShapes.Chip)
-                        .clickable { onAddPlan(selectedDay) }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add plan", style = AppType.BodyStrong, color = AppColors.Accent)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        item {
-            AppCard(padding = PaddingValues(0.dp)) {
-                if (plansForDay.isEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text("Nothing planned", style = AppType.BodyStrong, color = AppColors.TextPrimary)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "Add a plan for $selectedDay, or log an extra exercise below.",
-                            style = AppType.Caption,
-                            color = AppColors.TextSecondary,
-                            textAlign = TextAlign.Center,
+                            text = "Hello, ${auth.userName?.split(' ')?.first() ?: "there"}",
+                            style = AppType.LargeTitle,
+                            color = AppColors.TextPrimary,
+                            maxLines = 1,
                         )
                     }
-                } else {
-                    plansForDay.forEachIndexed { index, plan ->
-                        if (index > 0) RowDivider()
-                        val completed = isCompleted(plan)
-                        PlanRow(
-                            plan = plan,
-                            exercises = exerciseCount(plan),
-                            completed = completed,
-                            canStart = !completed && exerciseCount(plan) > 0,
-                            onClick = { onOpenPlan(plan) },
-                            onStart = { onStartWorkout(plan) },
-                            onDelete = { planToDelete = plan },
-                        )
+                    IconButton(onClick = onOpenLibrary) {
+                        Icon(Icons.Rounded.MenuBook, contentDescription = "Exercise library", tint = AppColors.TextSecondary)
                     }
-                }
-                RowDivider()
-                // Exercises done on top of (or instead of) the plans: added straight to the day, no plan needed.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            scope.launch {
-                                knownExercises = exerciseViewModel.knownExercises()
-                                showExtraSheet = true
-                            }
-                        }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(AppColors.SurfaceHigh),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(22.dp))
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Add extra exercise", style = AppType.BodyStrong, color = AppColors.TextPrimary)
-                        Text("Something that's not in a plan", style = AppType.Caption, color = AppColors.TextSecondary)
-                    }
+                    Avatar(name = auth.userName)
                 }
             }
-        }
 
-        // The coach: the few things most worth doing next, from the user's own logs.
-        if (advice.isNotEmpty()) {
+            // The week at a glance
             item {
+                val weekStart = currentWeek.first()
+                val weekEnd = currentWeek.last()
+                val todaysPlans = groupedPlans[dayName(today.dayOfWeek)].orEmpty()
+                val doneToday = todaysPlans.count { isCompletedOn(it, today) }
+                Spacer(Modifier.height(20.dp))
+                AppCard(padding = PaddingValues(vertical = 16.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        SummaryStat(
+                            value = currentStreak(sessions, today, profileState.profile.restDays).toString(),
+                            label = "Day streak",
+                            accentIcon = true,
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatDivider()
+                        SummaryStat(
+                            value = sessions.count { it.date.toLocalDate() in weekStart..weekEnd }.toString(),
+                            label = "Workouts this week",
+                            modifier = Modifier.weight(1f),
+                        )
+                        StatDivider()
+                        SummaryStat(
+                            value = if (todaysPlans.isEmpty()) "Rest" else "$doneToday/${todaysPlans.size}",
+                            label = if (todaysPlans.isEmpty()) "Today" else "Done today",
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+
+            // Plans the trainer sent that are waiting for an answer: one card for a week's worth, with Accept and Decline
+            if (offers.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    TrainerOffersCard(offers = offers, onAccept = planViewModel::acceptOffer, onDecline = planViewModel::declineOffer)
+                }
+            }
+
+            // Week strip
+            item {
+                Spacer(Modifier.height(16.dp))
+                WeekStrip(
+                    week = currentWeek,
+                    today = today,
+                    selectedDay = selectedDay,
+                    dayStatus = { date -> dayStatus(date, groupedPlans[dayName(date.dayOfWeek)].orEmpty(), sessions) },
+                    onSelect = { day ->
+                        selectedDay = day
+                        exerciseViewModel.loadExercisesByDay(day)
+                    },
+                )
+            }
+
+            // The selected day's plans
+            item {
+                val done = plansForDay.count { isCompleted(it) }
                 Spacer(Modifier.height(28.dp))
-                AccentTitle("For you", modifier = Modifier.padding(start = 4.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth().padding(start = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        AccentTitle(if (selectedDate == today) "Today" else selectedDay, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        if (plansForDay.isNotEmpty()) {
+                            Text(
+                                "$done of ${plansForDay.size} done",
+                                style = AppType.Caption,
+                                color = if (done == plansForDay.size) AppColors.Accent else AppColors.TextSecondary,
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(AppShapes.Chip)
+                            .clickable { onAddPlan(selectedDay) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add plan", style = AppType.BodyStrong, color = AppColors.Accent)
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
-                AdviceCard(advice, limit = 3, onSeeAll = onOpenCoach, acceptLabel = acceptLabel, onAccept = onAcceptAdvice)
+            }
+
+            item {
+                AppCard(padding = PaddingValues(0.dp)) {
+                    if (plansForDay.isEmpty()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text("Nothing planned", style = AppType.BodyStrong, color = AppColors.TextPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "Add a plan for $selectedDay, or log an extra exercise below.",
+                                style = AppType.Caption,
+                                color = AppColors.TextSecondary,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    } else {
+                        plansForDay.forEachIndexed { index, plan ->
+                            if (index > 0) RowDivider()
+                            val completed = isCompleted(plan)
+                            PlanRow(
+                                plan = plan,
+                                exercises = exerciseCount(plan),
+                                completed = completed,
+                                canStart = !completed && exerciseCount(plan) > 0,
+                                onClick = { onOpenPlan(plan) },
+                                onStart = { onStartWorkout(plan) },
+                                onDelete = { planToDelete = plan },
+                            )
+                        }
+                    }
+                    RowDivider()
+                    // Exercises done on top of (or instead of) the plans: added straight to the day, no plan needed.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                scope.launch {
+                                    knownExercises = exerciseViewModel.knownExercises()
+                                    showExtraSheet = true
+                                }
+                            }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(AppColors.SurfaceHigh),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(22.dp))
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Add extra exercise", style = AppType.BodyStrong, color = AppColors.TextPrimary)
+                            Text("Something that's not in a plan", style = AppType.Caption, color = AppColors.TextSecondary)
+                        }
+                    }
+                }
+            }
+
+            // The coach: the few things most worth doing next, from the user's own logs.
+            if (advice.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(28.dp))
+                    AccentTitle("For you", modifier = Modifier.padding(start = 4.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(10.dp))
+                    AdviceCard(advice, limit = 3, onSeeAll = onOpenCoach, acceptLabel = acceptLabel, onAccept = onAcceptAdvice)
+                }
             }
         }
+        BodyEdgeHandle(onOpen = onOpenBody, modifier = Modifier.align(Alignment.CenterEnd))
     }
 
     planToDelete?.let { plan ->

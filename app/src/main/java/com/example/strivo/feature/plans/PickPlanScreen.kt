@@ -1,11 +1,7 @@
 package com.example.strivo.feature.plans
 
-import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,14 +10,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FitnessCenter
@@ -29,8 +22,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,25 +32,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.strivo.core.ui.components.AccentButton
 import com.example.strivo.core.ui.components.IconBadge
 import com.example.strivo.core.ui.components.ScreenTopBar
+import com.example.strivo.core.ui.components.SectionLabel
 import com.example.strivo.core.ui.components.StrivoAlertDialog
 import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppShapes
 import com.example.strivo.core.ui.theme.AppType
-import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
+import com.example.strivo.domain.plan.LibraryPlan
 import kotlinx.coroutines.launch
 
 /**
- * Lists the prebuilt plans (empty until the user creates one). Tapping a plan copies it, with its
- * exercises, onto [day] and goes back.
+ * Where a plan for [day] comes from. The user's own plans come first: the ones they made, the ones a trainer sent and accepted, and
+ * the ones they took from the plan library. Under them is the plan library (what an admin publishes, or the starter plans), which
+ * works with no trainer at all. Tapping a plan puts a copy on the day and goes back; the copy stays linked to the user's plan, so what
+ * they change on the day (heavier weights, fewer reps on the last set, an exercise more or less) is kept in the plan. A plan taken from
+ * the library becomes one of the user's own at that moment.
  */
 @Composable
 fun PickPlanScreen(
@@ -70,127 +65,94 @@ fun PickPlanScreen(
 ) {
     val scope = rememberCoroutineScope()
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
-    val prebuilt = remember(plans) { plans.filter { it.isPrebuilt } }
+    val library by planViewModel.libraryPlans.collectAsStateWithLifecycle()
+    val counts by planViewModel.exerciseCounts.collectAsStateWithLifecycle()
+    val own = remember(plans) { plans.filter { it.isPrebuilt } }
+    // A library plan the user already took is one of their own: it is in the first list, with their changes, not in this one.
+    val fromLibrary = remember(library, own) {
+        val taken = own.map { it.origin }.toSet()
+        library.filter { it.origin !in taken }
+    }
     var planToDelete by remember { mutableStateOf<Plan?>(null) }
-    var showPaste by remember { mutableStateOf(false) }
-    val context = LocalContext.current
+
+    LaunchedEffect(Unit) { planViewModel.refreshPlans() }
+
+    fun put(action: suspend () -> Unit) {
+        scope.launch {
+            action()
+            exerciseViewModel.loadExercisesByDay(day)
+            onBack()
+        }
+    }
 
     Scaffold(
         containerColor = AppColors.Background,
         topBar = { ScreenTopBar(title = "Add to $day", onBack = onBack) },
     ) { padding ->
-        if (prebuilt.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                IconBadge(
-                    icon = Icons.Rounded.FitnessCenter,
-                    padding = 18.dp,
-                    iconSize = 34.dp,
-                )
-                Spacer(Modifier.height(24.dp))
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            item {
                 Text(
-                    "No prebuilt plans yet",
-                    color = AppColors.TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Create a plan once, then add it to any day.",
+                    "Tap a plan to put it on $day. What you change on the day (weights, reps, exercises) is kept in your plan.",
+                    style = AppType.Body,
                     color = AppColors.TextSecondary,
-                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 18.dp),
                 )
-                Spacer(Modifier.height(40.dp))
-                AccentButton(
-                    text = "CREATE PLAN",
-                    onClick = onCreatePlan,
-                    modifier = Modifier.width(200.dp),
-                    icon = Icons.Rounded.Add,
-                )
-                Spacer(Modifier.height(12.dp))
-                PastePlanButton { showPaste = true }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            ) {
+
+            item { SectionLabel("Your plans") }
+            if (own.isEmpty()) {
                 item {
                     Text(
-                        "Tap a plan to add it to $day.",
-                        color = AppColors.TextSecondary,
-                        fontSize = 14.sp,
+                        "Nothing yet. Take a plan from the library below, or make your own.",
+                        style = AppType.Caption,
+                        color = AppColors.TextTertiary,
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                 }
-                items(prebuilt, key = { it.planId ?: it.hashCode().toLong() }) { plan ->
-                    Row(
-                        modifier = Modifier
-                            .padding(bottom = 16.dp)
-                            .fillMaxWidth()
-                            .clip(AppShapes.Card)
-                            .background(AppColors.Surface)
-                            .clickable {
-                                scope.launch {
-                                    planViewModel.addPlanToDay(plan, day)
-                                    exerciseViewModel.loadExercisesByDay(day)
-                                    onBack()
-                                }
-                            }
-                            .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconBadge(icon = Icons.Rounded.FitnessCenter)
-                        Spacer(Modifier.width(16.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(plan.planName, style = AppType.Headline, color = AppColors.TextPrimary)
-                            Spacer(Modifier.height(4.dp))
-                            Text("Tap to add to $day", color = AppColors.TextSecondary, fontSize = 13.sp)
-                        }
-                        IconButton(onClick = { onEditPlan(plan) }) {
-                            Icon(Icons.Rounded.EditNote, contentDescription = "Edit exercises", tint = AppColors.TextSecondary)
-                        }
-                        IconButton(onClick = { planToDelete = plan }) {
-                            Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete plan", tint = AppColors.TextTertiary)
-                        }
+            }
+            items(own, key = { "own-" + (it.planId ?: it.hashCode().toLong()) }) { plan ->
+                PlanRow(
+                    title = plan.planName,
+                    detail = listOf(countText(counts[plan.planId] ?: 0), originText(plan)).filter { it.isNotEmpty() }.joinToString(" · "),
+                    onClick = { put { planViewModel.addPlanToDay(plan, day) } },
+                ) {
+                    IconButton(onClick = { onEditPlan(plan) }) {
+                        Icon(Icons.Rounded.EditNote, contentDescription = "Edit exercises", tint = AppColors.TextSecondary)
+                    }
+                    IconButton(onClick = { planToDelete = plan }) {
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "Delete plan", tint = AppColors.TextTertiary)
                     }
                 }
-                item {
-                    AccentButton(
-                        text = "CREATE NEW PLAN",
-                        onClick = onCreatePlan,
-                        modifier = Modifier.fillMaxWidth(),
-                        icon = Icons.Rounded.Add,
+            }
+
+            if (fromLibrary.isNotEmpty()) {
+                item { Spacer(Modifier.height(8.dp)) }
+                item { SectionLabel("Plan library") }
+                items(fromLibrary, key = { "library-" + it.id }) { plan ->
+                    PlanRow(
+                        title = plan.name,
+                        detail = listOf(countText(plan.exercises.size), plan.level).filter { it.isNotEmpty() }.joinToString(" · "),
+                        extra = plan.exercises.joinToString(", ") { it.name },
+                        onClick = { put { planViewModel.addLibraryPlanToDay(plan, day) } },
                     )
-                    Spacer(Modifier.height(8.dp))
-                    PastePlanButton { showPaste = true }
                 }
             }
-        }
-    }
 
-    if (showPaste) {
-        PasteSharedDialog(
-            title = "Paste plan",
-            onDismiss = { showPaste = false },
-            onImport = { shared ->
-                showPaste = false
-                scope.launch {
-                    val name = shared.planName ?: "Shared plan"
-                    val id = planViewModel.addPlan(Plan(planName = name, planDay = PREBUILT_DAY))
-                    exerciseViewModel.addExercises(shared.exercises.map { it.copy(planId = id) })
-                    Toast.makeText(context, "Added '$name' to your prebuilt plans", Toast.LENGTH_SHORT).show()
-                }
-            },
-        )
+            item {
+                Spacer(Modifier.height(8.dp))
+                AccentButton(
+                    text = "CREATE NEW PLAN",
+                    onClick = onCreatePlan,
+                    modifier = Modifier.fillMaxWidth(),
+                    icon = Icons.Rounded.Add,
+                )
+            }
+        }
     }
 
     planToDelete?.let { plan ->
@@ -207,18 +169,52 @@ fun PickPlanScreen(
             },
         ) {
             Text(
-                "This deletes '${plan.planName}' from your prebuilt plans. Copies already on a day are kept.",
+                "This deletes '${plan.planName}' from your plans. The days it is already on keep their copy, but it is no longer kept up to date.",
                 color = AppColors.TextSecondary,
             )
         }
     }
 }
 
+private fun countText(count: Int): String = if (count == 1) "1 exercise" else "$count exercises"
+
+/** Where one of the user's plans came from, in words. */
+private fun originText(plan: Plan): String = when {
+    plan.fromTrainer -> "From your trainer"
+    plan.fromLibrary -> "From the library"
+    else -> "Made by you"
+}
+
+/** One plan in a list: a card that adds it to the day when tapped, with room at the end for buttons. */
 @Composable
-private fun PastePlanButton(onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Icon(Icons.Rounded.ContentPaste, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text("Paste a shared plan", style = AppType.BodyStrong, color = AppColors.Accent)
+private fun PlanRow(
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+    extra: String = "",
+    actions: @Composable () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .padding(bottom = 12.dp)
+            .fillMaxWidth()
+            .clip(AppShapes.Card)
+            .background(AppColors.Surface)
+            .clickable(onClick = onClick)
+            .padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBadge(icon = Icons.Rounded.FitnessCenter)
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = AppType.Headline, color = AppColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(4.dp))
+            Text(detail, style = AppType.Caption, color = AppColors.TextSecondary)
+            if (extra.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
+                Text(extra, style = AppType.Caption, color = AppColors.TextTertiary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        actions()
     }
 }

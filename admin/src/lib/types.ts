@@ -71,7 +71,12 @@ export interface PlanRow {
   id: string;
   planId?: number;
   planName?: string;
+  /** A weekday, or 'Prebuilt' for one of the client's own plans (the ones they put on a day). */
   planDay?: string;
+  /** On a weekday's plan: the planId of the client's own plan it was made from. */
+  sourcePlanId?: number | null;
+  /** On a client's own plan: where it came from, 'library:<id>' (the plan library) or 'trainer:<id>' (a plan sent from here); empty when they made it. */
+  origin?: string;
   isDemo?: number;
 }
 
@@ -85,6 +90,8 @@ export interface ExerciseRow {
   notes?: string;
   dropSets?: number;
   sortOrder?: number;
+  /** The plan's sets as JSON text (weight and reps of each); present once the client has changed a set. */
+  setsData?: string;
 }
 
 export interface WeightRow {
@@ -169,6 +176,23 @@ export interface AssignedExercise {
   weightKg: number;
   dropSets: number;
   notes: string;
+}
+
+/** The part of a plan in the plan library an admin edits (no id or timestamps). */
+export interface LibraryPlanFields {
+  name: string;
+  description: string;
+  level: string;
+  active: boolean;
+  exercises: AssignedExercise[];
+}
+
+/** planLibrary/{planId}: a plan every user can browse in the app and put on a day, built from the exercise library. */
+export interface LibraryPlan extends LibraryPlanFields {
+  id: string;
+  createdAt?: number;
+  updatedAt?: number;
+  updatedBy?: string;
 }
 
 /** What the trainer fills in when sending a plan. */

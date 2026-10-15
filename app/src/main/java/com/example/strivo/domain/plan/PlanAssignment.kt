@@ -1,7 +1,6 @@
 package com.example.strivo.domain.plan
 
 import com.example.strivo.domain.model.Exercise
-import com.example.strivo.domain.model.MaxPlannedDropSets
 import com.example.strivo.domain.model.PREBUILT_DAY
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,22 +30,7 @@ data class PlanAssignment(
         .put("note", note)
         .put("sentByName", trainerName)
         .put("sentAt", sentAt)
-        .put(
-            "exercises",
-            JSONArray().also { array ->
-                exercises.forEach { e ->
-                    array.put(
-                        JSONObject()
-                            .put("name", e.name)
-                            .put("sets", e.sets.toIntOrNull() ?: 3)
-                            .put("reps", e.reps.toIntOrNull() ?: 10)
-                            .put("weightKg", e.weight.toDoubleOrNull() ?: 0.0)
-                            .put("dropSets", e.dropSets)
-                            .put("notes", e.notes),
-                    )
-                }
-            },
-        )
+        .put("exercises", exercises.toPlanJson())
 
     companion object {
         /** A plan the trainer has sent that the app has not shown yet. */
@@ -58,7 +42,6 @@ data class PlanAssignment(
         /** The user accepted it and it is in their plans. */
         const val STATUS_ACCEPTED = "accepted"
         const val STATUS_DECLINED = "declined"
-        private const val MAX_EXERCISES = 30
 
         /** A plan the user has not answered yet. */
         fun isWaiting(status: Any?): Boolean = status == STATUS_SENT || status == STATUS_DELIVERED
@@ -69,20 +52,7 @@ data class PlanAssignment(
             val planName = (data["planName"] as? String)?.trim()?.take(60).orEmpty()
             val day = (data["day"] as? String)?.trim().orEmpty()
             if (planName.isEmpty() || day !in AssignableDays) return null
-            val exercises = (data["exercises"] as? List<*>).orEmpty().take(MAX_EXERCISES).mapNotNull { item ->
-                val map = item as? Map<*, *> ?: return@mapNotNull null
-                val name = (map["name"] as? String)?.trim()?.take(80).orEmpty()
-                if (name.isEmpty()) return@mapNotNull null
-                Exercise(
-                    planId = -1L,
-                    name = name,
-                    sets = ((map["sets"] as? Number)?.toInt() ?: 3).coerceIn(1, 20).toString(),
-                    reps = ((map["reps"] as? Number)?.toInt() ?: 10).coerceIn(1, 100).toString(),
-                    weight = ((map["weightKg"] as? Number)?.toDouble()?.takeIf { !it.isNaN() } ?: 0.0).coerceIn(0.0, 1000.0).toString(),
-                    notes = (map["notes"] as? String)?.trim()?.take(500).orEmpty(),
-                    dropSets = ((map["dropSets"] as? Number)?.toInt() ?: 0).coerceIn(0, MaxPlannedDropSets),
-                )
-            }
+            val exercises = parsePlanExercises(data["exercises"] as? List<*>)
             if (exercises.isEmpty()) return null
             return PlanAssignment(
                 id = id,
@@ -105,15 +75,6 @@ data class PlanAssignment(
             val array = JSONArray(text ?: return emptyList())
             List(array.length()) { array.getJSONObject(it) }.mapNotNull { json -> fromMap(json.optString("id"), json.toPlainMap()) }
         }.getOrDefault(emptyList())
-
-        private fun JSONObject.toPlainMap(): Map<String, Any?> = keys().asSequence().associateWith { key -> get(key).toPlain() }
-
-        private fun Any.toPlain(): Any? = when (this) {
-            is JSONObject -> toPlainMap()
-            is JSONArray -> List(length()) { get(it).toPlain() }
-            JSONObject.NULL -> null
-            else -> this
-        }
     }
 }
 

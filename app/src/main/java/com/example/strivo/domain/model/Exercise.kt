@@ -64,4 +64,9 @@ data class Exercise(
     val sortOrder: Int = -1, // position inside the plan; -1 = not placed yet (appended on create)
     /** Drop sets the plan adds after the working sets, each [DropStepKg] lighter than the set before it. */
     val dropSets: Int = 0,
+    /**
+     * On an exercise of a weekday's plan that was made from the user's own plan: the id of that plan's exercise. What changes here
+     * (the sets, the weights, the reps) is copied there, and that exercise is what the next day starts from. Null when not linked.
+     */
+    val sourceId: Long? = null,
 )

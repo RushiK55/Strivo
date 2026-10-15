@@ -14,6 +14,7 @@ import com.example.strivo.core.ui.theme.StrivoTheme
 import com.example.strivo.domain.body.BodyKey
 import com.example.strivo.domain.body.GlbReader
 import com.example.strivo.domain.body.MuscleCatalogue
+import com.example.strivo.domain.body.MuscleExercises
 import com.example.strivo.domain.body.MuscleNote
 import com.example.strivo.domain.body.TrainedMusclesFinder
 import com.example.strivo.domain.model.Exercise
@@ -42,7 +43,7 @@ class BodyPreviewActivity : ComponentActivity() {
         val names = mapOf(
             "Monday" to listOf("Bench Press", "Overhead Press", "Lateral Raise"),
             "Tuesday" to listOf("Pull-Up", "Barbell Row"),
-            "Wednesday" to listOf("Back Squat", "Romanian Deadlift"),
+            "Wednesday" to listOf("Squat", "Romanian Deadlift"),
             "Thursday" to listOf("Overhead Press", "Lateral Raise"),
             "Friday" to listOf("Deadlift", "Pull-Up"),
         )
@@ -73,6 +74,7 @@ class BodyPreviewActivity : ComponentActivity() {
                             notes = if (selected != null && subtitle != null) mapOf(selected to MuscleNote(subtitle, "")) else emptyMap(),
                             selected = selected,
                             skinOn = intent.getBooleanExtra("skin", selected == null),
+                            skeletonOn = intent.getBooleanExtra("skeleton", false),
                         ),
                     )
                 }
@@ -85,6 +87,15 @@ class BodyPreviewActivity : ComponentActivity() {
                     },
                     onSelect = { id -> state = state.copy(selected = id, skinOn = id == null) },
                     onToggleSkin = { state = state.copy(skinOn = !state.skinOn) },
+                    onToggleSkeleton = { state = state.copy(skeletonOn = !state.skeletonOn, skinOn = if (!state.skeletonOn) false else state.selected == null) },
+                    onAddExercise = { added ->
+                        val exercises = state.dayExercises + added.toPlanExercise(planId = 1)
+                        state = state.copy(dayExercises = exercises, trained = TrainedMusclesFinder.find(exercises, library, catalogue))
+                    },
+                    onSampleDay = {
+                        val exercises = state.dayExercises + MuscleExercises.sampleDay(state.day, library).map { it.toPlanExercise(planId = 1) }
+                        state = state.copy(dayExercises = exercises, trained = TrainedMusclesFinder.find(exercises, library, catalogue))
+                    },
                 )
             }
         }

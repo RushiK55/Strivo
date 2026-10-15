@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.strivo.StrivoApp
 import com.example.strivo.core.util.dayName
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.WorkoutSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,10 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises
+
+    /** The exercise library, for the picker of a plan. */
+    private val _library = MutableStateFlow<List<LibraryExercise>>(emptyList())
+    val library: StateFlow<List<LibraryExercise>> = _library
 
     private val _todayExercises = MutableStateFlow<List<Exercise>>(emptyList())
     val todayExercises: StateFlow<List<Exercise>> = _todayExercises
@@ -42,6 +47,19 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
 
     fun loadExercisesByPlan(planId: Long) {
         viewModelScope.launch { _exercises.value = repository.readExercisesByPlan(planId) }
+    }
+
+    fun loadLibrary() {
+        viewModelScope.launch { _library.value = repository.readLibrary() }
+    }
+
+    /** Puts a library exercise into a plan with its suggested sets, reps and weight; the plan's list is refreshed. */
+    fun addFromLibrary(exercise: LibraryExercise, planId: Long) {
+        viewModelScope.launch {
+            repository.addLibraryExercise(exercise, planId)
+            _exercises.value = repository.readExercisesByPlan(planId)
+            reloadDay(selectedDay())
+        }
     }
 
     fun loadExercisesByDay(day: String) {

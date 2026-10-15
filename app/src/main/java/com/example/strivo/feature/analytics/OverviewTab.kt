@@ -38,6 +38,8 @@ import com.example.strivo.core.util.formatKg
 import com.example.strivo.domain.analytics.AnalyticsRange
 import com.example.strivo.domain.analytics.AnalyticsReport
 import com.example.strivo.domain.analytics.DayStat
+import com.example.strivo.domain.analytics.parseDurationSeconds
+import com.example.strivo.domain.model.isWork
 import com.example.strivo.domain.model.WorkoutSession
 import java.util.Locale
 import java.time.format.TextStyle as DateTextStyle
@@ -206,22 +208,26 @@ internal fun Timeline(report: AnalyticsReport, onOpenSession: (WorkoutSession) -
         Card(padding = PaddingValues(vertical = 4.dp)) {
             rows.take(14).forEachIndexed { index, day ->
                 if (index > 0) HorizontalDivider(Modifier.padding(start = 72.dp), thickness = 1.dp, color = AppColors.Divider)
-                TimelineRow(day, onClick = day.sessions.firstOrNull()?.let { session -> { onOpenSession(session) } })
+                TimelineRow(day, onOpenSession)
             }
         }
     }
 }
 
+/**
+ * One day. A day with one workout is one line that opens it; a day with several (two plans, say) lists each workout on its own line,
+ * so every one can be opened, instead of one line that can only open the first.
+ */
 @Composable
-private fun TimelineRow(day: DayStat, onClick: (() -> Unit)?) {
+private fun TimelineRow(day: DayStat, onOpenSession: (WorkoutSession) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (day.sessions.size == 1) Modifier.clickable { onOpenSession(day.sessions.single()) } else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
     ) {
-        Column(Modifier.width(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.width(40.dp).padding(top = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 day.date.dayOfWeek.getDisplayName(DateTextStyle.SHORT, Locale.getDefault()),
                 style = AppType.Caption,
@@ -235,9 +241,30 @@ private fun TimelineRow(day: DayStat, onClick: (() -> Unit)?) {
         }
         Spacer(Modifier.width(16.dp))
         if (day.isRestDay) {
-            Text("Rest day", style = AppType.Body, color = AppColors.TextTertiary)
+            Text("Rest day", style = AppType.Body, color = AppColors.TextTertiary, modifier = Modifier.padding(top = 12.dp))
+        } else if (day.sessions.size > 1) {
+            Column(Modifier.weight(1f), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
+                day.sessions.forEach { session ->
+                    val volume = session.exercises.sumOf { exercise -> exercise.sets.filter { it.isWork }.sumOf { it.weight * it.reps } }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(AppShapes.Control)
+                            .clickable { onOpenSession(session) }
+                            .padding(vertical = 6.dp),
+                    ) {
+                        Text(session.planName, style = AppType.BodyStrong, color = AppColors.TextPrimary, maxLines = 1)
+                        Text(
+                            "${session.exercises.size} ${if (session.exercises.size == 1) "exercise" else "exercises"} · ${formatMinutes(parseDurationSeconds(session.totalTime).toDouble())} · ${formatKg(volume)}",
+                            style = AppType.Caption,
+                            color = AppColors.TextSecondary,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
         } else {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).padding(top = 0.dp)) {
                 Text(day.planNames.joinToString(" + "), style = AppType.BodyStrong, color = AppColors.TextPrimary, maxLines = 1)
                 Text(
                     "${day.exercises} exercises · ${formatMinutes(day.seconds.toDouble())} · ${formatKg(day.volumeKg)}",

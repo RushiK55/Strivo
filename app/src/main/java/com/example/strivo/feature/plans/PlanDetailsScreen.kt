@@ -1,7 +1,5 @@
 package com.example.strivo.feature.plans
 
-import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -34,13 +32,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ListAlt
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -81,7 +77,6 @@ import com.example.strivo.core.ui.components.StrivoAlertDialog
 import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppShapes
 import com.example.strivo.core.ui.theme.AppType
-import com.example.strivo.data.share.ExerciseShare
 import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.dropSetsSuffix
@@ -101,7 +96,6 @@ fun PlanDetailsScreen(
     exerciseViewModel: ExerciseViewModel,
     onBack: () -> Unit,
     onAddExercise: () -> Unit,
-    onOpenLibrary: () -> Unit = {},
     onEditExercise: (Exercise) -> Unit,
     onOpenExercise: (Exercise) -> Unit,
     onStartWorkout: () -> Unit,
@@ -110,7 +104,8 @@ fun PlanDetailsScreen(
     val exercises by exerciseViewModel.exercises.collectAsStateWithLifecycle()
     var exerciseToDelete by remember { mutableStateOf<Exercise?>(null) }
     var transfer by remember { mutableStateOf<Transfer?>(null) }
-    var showPaste by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
+    val library by exerciseViewModel.library.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
@@ -121,6 +116,7 @@ fun PlanDetailsScreen(
 
     LaunchedEffect(plan.planId) {
         plan.planId?.let { exerciseViewModel.loadExercisesByPlan(it) }
+        exerciseViewModel.loadLibrary()
     }
     LaunchedEffect(exercises) {
         if (draggingKey == null) items = exercises
@@ -174,7 +170,7 @@ fun PlanDetailsScreen(
     CollapsingListScreen(
         title = plan.planName,
         subtitle = listOf(
-            if (plan.isPrebuilt) "Prebuilt plan" else plan.planDay,
+            if (plan.isPrebuilt) "Your plan" else plan.planDay,
             if (exercises.size == 1) "1 exercise" else "${exercises.size} exercises",
         ).joinToString(" · "),
         expandedHeight = 132.dp,
@@ -199,21 +195,10 @@ fun PlanDetailsScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AccentTitle("Exercises", modifier = Modifier.weight(1f))
-                if (items.isNotEmpty()) {
-                    IconButton(onClick = { shareText(context, ExerciseShare.encodePlan(plan.planName, items), "Share plan") }) {
-                        Icon(Icons.Rounded.Share, contentDescription = "Share plan", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))
-                    }
-                }
-                IconButton(onClick = onOpenLibrary) {
-                    Icon(Icons.Rounded.MenuBook, contentDescription = "Add from the exercise library", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))
-                }
-                IconButton(onClick = { showPaste = true }) {
-                    Icon(Icons.Rounded.ContentPaste, contentDescription = "Paste exercises", tint = AppColors.TextSecondary, modifier = Modifier.size(22.dp))
-                }
                 Row(
                     modifier = Modifier
                         .clip(AppShapes.Chip)
-                        .clickable(onClick = onAddExercise)
+                        .clickable { picking = true }
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -225,7 +210,7 @@ fun PlanDetailsScreen(
         }
 
         if (items.isEmpty()) {
-            item { EmptyExercises(onAddExercise) }
+            item { EmptyExercises { picking = true } }
         } else {
             itemsIndexed(items, key = { _, e -> exerciseKey(e) }) { index, exercise ->
                 val key = exerciseKey(exercise)
@@ -258,7 +243,6 @@ fun PlanDetailsScreen(
                     onEdit = { onEditExercise(exercise) },
                     onCopy = { transfer = Transfer(exercise, move = false) },
                     onMove = { transfer = Transfer(exercise, move = true) },
-                    onShare = { shareText(context, ExerciseShare.encodeExercise(exercise), "Share exercise") },
                     onDelete = { exerciseToDelete = exercise },
                 )
             }
@@ -275,20 +259,14 @@ fun PlanDetailsScreen(
         item { Spacer(Modifier.height(120.dp)) }
     }
 
-    if (showPaste) {
-        PasteSharedDialog(
-            title = "Paste exercise",
-            onDismiss = { showPaste = false },
-            onImport = { shared ->
-                showPaste = false
-                val planId = plan.planId
-                if (planId != null) {
-                    scope.launch {
-                        exerciseViewModel.addExercises(shared.exercises.map { it.copy(planId = planId) })
-                        Toast.makeText(context, "Added ${shared.exercises.size} exercise(s)", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
+    if (picking) {
+        ExercisePickerSheet(
+            planName = plan.planName,
+            planExercises = exercises,
+            library = library,
+            onAdd = { picked -> plan.planId?.let { exerciseViewModel.addFromLibrary(picked, it) } },
+            onCustom = { picking = false; onAddExercise() },
+            onDismiss = { picking = false },
         )
     }
 
@@ -408,7 +386,6 @@ private fun ExerciseCard(
     onEdit: () -> Unit,
     onCopy: () -> Unit,
     onMove: () -> Unit,
-    onShare: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -492,7 +469,6 @@ private fun ExerciseCard(
                     DropdownMenuItem(text = { Text("Edit", color = AppColors.TextPrimary) }, onClick = { menuOpen = false; onEdit() })
                     DropdownMenuItem(text = { Text("Copy to another plan", color = AppColors.TextPrimary) }, onClick = { menuOpen = false; onCopy() })
                     DropdownMenuItem(text = { Text("Move to another plan", color = AppColors.TextPrimary) }, onClick = { menuOpen = false; onMove() })
-                    DropdownMenuItem(text = { Text("Share", color = AppColors.TextPrimary) }, onClick = { menuOpen = false; onShare() })
                     DropdownMenuItem(text = { Text("Delete", color = AppColors.Danger) }, onClick = { menuOpen = false; onDelete() })
                 }
             }
@@ -521,13 +497,4 @@ private fun StartWorkoutButton(onClick: () -> Unit, modifier: Modifier = Modifie
             icon = Icons.Rounded.PlayArrow,
         )
     }
-}
-
-/** Opens the system share sheet with [text], a message another Strivo user can paste into the app. */
-private fun shareText(context: Context, text: String, chooserTitle: String) {
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, text)
-    }
-    context.startActivity(Intent.createChooser(send, chooserTitle))
 }

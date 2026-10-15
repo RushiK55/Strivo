@@ -1,4 +1,4 @@
-// Every Firestore read and write the dashboard makes. The admin only ever WRITES to the library, the admins list and the
+// Every Firestore read and write the dashboard makes. The admin only ever WRITES to the libraries, the admins list and the
 // plans it sends a client (users/{uid}/assigned); the rest of a client's data is read-only to an admin (firestore.rules
 // enforces this, not just this code).
 import {
@@ -6,7 +6,10 @@ import {
   where, writeBatch, type DocumentData, type OrderByDirection, type QueryDocumentSnapshot, type Query,
 } from 'firebase/firestore';
 import { getFirebase } from './firebase';
-import type { ActivityEvent, AdminEntry, Assignment, AssignmentFields, ClientWorkout, LibraryExercise, LibraryFields, MuscleInfo, NutritionDay, ProfileDoc, UserSummary } from './types';
+import type {
+  ActivityEvent, AdminEntry, Assignment, AssignmentFields, ClientWorkout, LibraryExercise, LibraryFields, LibraryPlan, LibraryPlanFields, MuscleInfo,
+  NutritionDay, ProfileDoc, UserSummary,
+} from './types';
 
 const PAGE = 50;
 
@@ -124,6 +127,44 @@ export async function setLibraryMuscles(updates: { id: string; primaryMuscles: s
     const batch = writeBatch(db());
     for (const { id, ...muscles } of updates.slice(i, i + 400)) {
       batch.set(doc(db(), 'library', id), { ...muscles, updatedAt: now, updatedBy: adminUid }, { merge: true });
+      written += 1;
+    }
+    await batch.commit();
+  }
+  return written;
+}
+
+// ---- Plan library ----
+
+export const countPlanLibrary = () => count(collection(db(), 'planLibrary'));
+
+export async function listPlanLibrary(): Promise<LibraryPlan[]> {
+  const snap = await getDocs(collection(db(), 'planLibrary'));
+  return snap.docs.map((d) => withId<LibraryPlan>(d));
+}
+
+/** Creates or updates one plan of the plan library. `createdAt` is only set the first time. */
+export async function savePlanLibraryPlan(id: string, value: LibraryPlanFields, adminUid: string, isNew: boolean): Promise<void> {
+  const now = Date.now();
+  await setDoc(doc(db(), 'planLibrary', id), { ...value, updatedAt: now, updatedBy: adminUid, ...(isNew ? { createdAt: now } : {}) }, { merge: true });
+}
+
+export async function setPlanLibraryActive(id: string, active: boolean, adminUid: string): Promise<void> {
+  await setDoc(doc(db(), 'planLibrary', id), { active, updatedAt: Date.now(), updatedBy: adminUid }, { merge: true });
+}
+
+export async function deletePlanLibraryPlan(id: string): Promise<void> {
+  await deleteDoc(doc(db(), 'planLibrary', id));
+}
+
+/** Writes the given plans in batches. Returns how many were written. */
+export async function importPlanLibrary(plans: (LibraryPlanFields & { id: string })[], adminUid: string): Promise<number> {
+  const now = Date.now();
+  let written = 0;
+  for (let i = 0; i < plans.length; i += 400) {
+    const batch = writeBatch(db());
+    for (const { id, ...fields } of plans.slice(i, i + 400)) {
+      batch.set(doc(db(), 'planLibrary', id), { ...fields, createdAt: now, updatedAt: now, updatedBy: adminUid });
       written += 1;
     }
     await batch.commit();

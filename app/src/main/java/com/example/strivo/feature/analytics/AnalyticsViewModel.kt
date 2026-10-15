@@ -73,7 +73,8 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
     private var profile = BodyProfile(null, null, null, null)
     private var restDays: Set<DayOfWeek> = setOf(DayOfWeek.SUNDAY)
     /** Weekdays with a plan on the weekly schedule, for adherence. */
-    private var scheduledDays: Set<DayOfWeek> = emptySet()
+    /** How many plans each weekday has. */
+    private var scheduledPlans: Map<DayOfWeek, Int> = emptyMap()
     /** Planned weight of each copy of each exercise in the user's plans, by exerciseKey. */
     private var planned: Map<String, List<PlannedExercise>> = emptyMap()
 
@@ -88,10 +89,11 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             food = repository.readFood()
             planned = repository.plannedExercises()
             activities = repository.readActivities()
-            scheduledDays = repository.readAllPlans()
+            scheduledPlans = repository.readAllPlans()
                 .filter { !it.isPrebuilt && it.planName != EXTRA_PLAN_NAME }
                 .mapNotNull { plan -> DayOfWeek.entries.firstOrNull { dayName(it) == plan.planDay } }
-                .toSet()
+                .groupingBy { it }
+                .eachCount()
             profile = withContext(Dispatchers.IO) {
                 val saved = app.userPrefs.getProfile()
                 restDays = saved.restDays
@@ -166,7 +168,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
                 report = buildReport(sessions, range, today, activities, restDays, weightOn),
                 body = body,
                 nutrition = buildNutrition(food, range, today, body.maintenanceKcal),
-                consistency = buildConsistency(sessions, scheduledDays, range, today),
+                consistency = buildConsistency(sessions, scheduledPlans, range, today),
                 exercises = exercises,
                 records = recentRecords(exercises, today.minusDays(29)),
                 expenditure = estimateExpenditure(food, weightLog, today),

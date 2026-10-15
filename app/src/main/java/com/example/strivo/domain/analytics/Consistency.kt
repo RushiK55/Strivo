@@ -9,7 +9,7 @@ import java.time.temporal.TemporalAdjusters
  * How regularly the user trains: against their own weekly schedule, across the weekdays and the hours of the day.
  */
 
-/** Scheduled training days that had a workout, out of all scheduled days so far. */
+/** Planned workouts that were done, out of all the plans scheduled so far (a day with two plans counts two). */
 data class Adherence(val done: Int, val scheduled: Int) {
     val percent: Double get() = if (scheduled == 0) 0.0 else done * 100.0 / scheduled
 }
@@ -21,7 +21,7 @@ enum class TimeOfDay(val label: String) {
 }
 
 data class ConsistencyReport(
-    /** Plan days (from the weekly schedule) that had a workout; null when nothing is scheduled. */
+    /** Planned workouts (from the weekly schedule, every plan of a day) that were done; null when nothing is scheduled. */
     val adherence: Adherence?,
     /** Workouts per weekday, Monday first. */
     val byWeekday: List<Int>,
@@ -43,12 +43,13 @@ fun timeOfDay(hour: Int): TimeOfDay = when (hour) {
 }
 
 /**
- * [scheduledDays] are the weekdays that have a plan. Adherence only counts from the first workout the user
- * saved, so the weeks before they started using the app do not count as missed.
+ * [scheduledPlans] is how many plans each weekday has (a weekday without a plan is left out). A day with two plans is two workouts to do,
+ * and each workout saved that day covers one of them. Adherence only counts from the first workout the user saved, so the weeks before
+ * they started using the app do not count as missed.
  */
 fun buildConsistency(
     sessions: List<WorkoutSession>,
-    scheduledDays: Set<DayOfWeek>,
+    scheduledPlans: Map<DayOfWeek, Int>,
     range: AnalyticsRange,
     today: LocalDate,
 ): ConsistencyReport {
@@ -57,14 +58,19 @@ fun buildConsistency(
     val trained = sessions.map { it.date.toLocalDate() }.toSet()
 
     val firstWorkout = sessions.minOfOrNull { it.date.toLocalDate() }
-    val adherence = if (scheduledDays.isEmpty() || firstWorkout == null) null else {
+    val perDay = sessions.groupingBy { it.date.toLocalDate() }.eachCount()
+    val adherence = if (scheduledPlans.isEmpty() || firstWorkout == null) null else {
         val from = maxOf(start, firstWorkout)
-        // Today only counts once it is done, so an afternoon session not yet started is not a miss.
-        val days = generateSequence(from) { it.plusDays(1) }.takeWhile { it <= today }
-            .filter { it.dayOfWeek in scheduledDays }
-            .filter { it < today || it in trained }
-            .toList()
-        Adherence(done = days.count { it in trained }, scheduled = days.size).takeIf { it.scheduled > 0 }
+        var done = 0
+        var scheduled = 0
+        generateSequence(from) { it.plusDays(1) }.takeWhile { it <= today }.forEach { date ->
+            val plans = scheduledPlans[date.dayOfWeek] ?: return@forEach
+            val finished = minOf(plans, perDay[date] ?: 0)
+            // Today only counts what is done, so an afternoon session not yet started is not a miss.
+            scheduled += if (date < today) plans else finished
+            done += finished
+        }
+        Adherence(done = done, scheduled = scheduled).takeIf { it.scheduled > 0 }
     }
 
     val calendarStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(CalendarWeeks - 1L)

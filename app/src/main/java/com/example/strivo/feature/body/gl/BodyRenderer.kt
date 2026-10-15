@@ -73,6 +73,7 @@ internal class BodyRenderer(
     private var body = BodyKey.Male
     private var drawState = DrawState()
     private var skinWanted = true
+    private var skeletonOn = false
     private var skinOpacity = SKIN_OPACITY
     private var skinFade: Triple<Float, Float, Long>? = null // from, to, start (ms)
 
@@ -163,7 +164,7 @@ internal class BodyRenderer(
         this.body = body
         try {
             var pickId = 1
-            meshes = model.parts.filter { it.kind != PartKind.Skeleton }.map { part -> upload(part, if (part.kind == PartKind.Muscle) pickId++ else 0) }
+            meshes = model.parts.map { part -> upload(part, if (part.kind == PartKind.Muscle) pickId++ else 0) }
         } catch (e: RuntimeException) {
             events.onFailure(e.message ?: "The body could not be put on the graphics card.")
             return
@@ -173,8 +174,9 @@ internal class BodyRenderer(
         events.onReady()
     }
 
-    fun setScene(state: DrawState, skin: Boolean) {
+    fun setScene(state: DrawState, skin: Boolean, skeleton: Boolean = false) {
         drawState = state
+        skeletonOn = skeleton
         refreshLooks()
         if (skin != skinWanted) {
             skinWanted = skin
@@ -185,7 +187,10 @@ internal class BodyRenderer(
     private fun refreshLooks() {
         looks = Array(meshes.size) { i ->
             val part = meshes[i].part
-            if (part.kind == PartKind.Muscle) MuscleLook.lookOf(part.group, part.layer, drawState) else null
+            if (part.kind != PartKind.Muscle) return@Array null
+            val look = MuscleLook.lookOf(part.group, part.layer, drawState)
+            // With the skeleton shown, the muscles that are not lit step back so the bones can be seen through them.
+            if (skeletonOn && look.glow == 0f) look.copy(opacity = min(look.opacity, SKELETON_MUSCLE_OPACITY)) else look
         }
     }
 
@@ -258,6 +263,11 @@ internal class BodyRenderer(
         GLES30.glDisable(GLES30.GL_BLEND)
         GLES30.glDepthMask(true)
         for (i in meshes.indices) { val look = looks.getOrNull(i); if (look != null && look.opacity >= 0.999f) drawMuscle(meshes[i], look, pulse) }
+        if (skeletonOn) {
+            GLES30.glUniform4f(uColor, BONE_COLOR[0], BONE_COLOR[1], BONE_COLOR[2], 1f)
+            GLES30.glUniform3f(uEmissive, 0f, 0f, 0f)
+            for (mesh in meshes) if (mesh.part.kind == PartKind.Skeleton) draw(mesh)
+        }
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         GLES30.glDepthMask(false)
@@ -483,8 +493,12 @@ internal class BodyRenderer(
         /** How solid the skin is: see-through enough for the muscles (and what glows) to show, solid enough to read as a body. */
         const val SKIN_OPACITY = 0.32f
 
+        /** How solid the muscles that are not lit are while the skeleton is shown. */
+        const val SKELETON_MUSCLE_OPACITY = 0.22f
+
         /** The highlight colour (the app's amber, #FFB800) and the skin's (#9AA5BD), in linear light. */
         val AMBER = floatArrayOf(1f, 0.7216f.pow(2.2f), 0f)
+        val BONE_COLOR = floatArrayOf(0.89f.pow(2.2f), 0.86f.pow(2.2f), 0.78f.pow(2.2f))
         val SKIN_COLOR = floatArrayOf(0.6039f.pow(2.2f), 0.6471f.pow(2.2f), 0.7412f.pow(2.2f))
 
         const val VERTEX = """#version 300 es

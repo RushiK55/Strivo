@@ -9,6 +9,7 @@ import com.example.strivo.domain.body.BodyKey
 import com.example.strivo.domain.body.GlbModel
 import com.example.strivo.domain.body.GlbReader
 import com.example.strivo.domain.body.MuscleCatalogue
+import com.example.strivo.domain.body.MuscleExercises
 import com.example.strivo.domain.body.MuscleNote
 import com.example.strivo.domain.body.TrainedMuscles
 import com.example.strivo.domain.body.TrainedMusclesFinder
@@ -43,6 +44,8 @@ data class BodyUiState(
     val notes: Map<String, MuscleNote> = emptyMap(),
     val selected: String? = null,
     val skinOn: Boolean = true,
+    /** Whether the skeleton is shown (the muscles that are not lit step back so it can be seen). */
+    val skeletonOn: Boolean = false,
 ) {
     /** The labels of the muscles a day trains mainly, for a line of text ("Lats · Biceps"). */
     fun mainLabels(): List<String> = catalogue?.let { c -> trained.main.map { c.labelOf(it) } }.orEmpty()
@@ -91,7 +94,7 @@ class BodyViewModel(application: Application) : AndroidViewModel(application) {
                 }.getOrElse { previous.copy(loading = false, error = "The 3D body could not be loaded.") }
             }
             // Keep a choice made while it was loading (a muscle picked, the skin switched).
-            _state.update { current -> next.copy(selected = current.selected, skinOn = current.skinOn, day = current.day) }
+            _state.update { current -> next.copy(selected = current.selected, skinOn = current.skinOn, skeletonOn = current.skeletonOn, day = current.day) }
         }
     }
 
@@ -105,7 +108,7 @@ class BodyViewModel(application: Application) : AndroidViewModel(application) {
     /** Shows what a day of the week trains. */
     fun selectDay(day: String) {
         if (day == _state.value.day) return
-        _state.update { it.copy(day = day, selected = null, skinOn = true) }
+        _state.update { it.copy(day = day, selected = null, skinOn = !it.skeletonOn) }
         viewModelScope.launch {
             val exercises = withContext(Dispatchers.IO) { app.repository.readExercisesByDay(day) }
             _state.update { current ->
@@ -117,11 +120,46 @@ class BodyViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Picks a muscle (or none). A picked muscle takes the skin off so it can be seen; none puts it back. */
     fun select(id: String?) {
-        _state.update { it.copy(selected = id, skinOn = id == null) }
+        _state.update { it.copy(selected = id, skinOn = id == null && !it.skeletonOn) }
     }
 
     fun toggleSkin() {
         _state.update { it.copy(skinOn = !it.skinOn) }
+    }
+
+    /** Shows or hides the skeleton; showing it takes the skin off, which would hide it. */
+    fun toggleSkeleton() {
+        _state.update { it.copy(skeletonOn = !it.skeletonOn, skinOn = if (!it.skeletonOn) false else it.selected == null) }
+    }
+
+    /**
+     * Adds a library exercise to the shown day with its suggested sets, reps and weight, in the day's own "extra" plan (so a trainer's
+     * plan is never changed). The muscles it works then glow. An exercise the day already has is not added twice.
+     */
+    fun addExercise(exercise: LibraryExercise) = addToDay(listOf(exercise))
+
+    /** For someone with nothing planned: fills the shown day with a starter day (push, pull, legs...) from the library. */
+    fun addSampleDay() {
+        val state = _state.value
+        addToDay(MuscleExercises.sampleDay(state.day, state.library))
+    }
+
+    private fun addToDay(exercises: List<LibraryExercise>) {
+        val day = _state.value.day
+        viewModelScope.launch {
+            val updated = withContext(Dispatchers.IO) {
+                val have = app.repository.readExercisesByDay(day).map { TrainedMusclesFinder.normalise(it.name) }.toSet()
+                val fresh = exercises.filter { TrainedMusclesFinder.normalise(it.name) !in have }
+                if (fresh.isEmpty()) return@withContext null
+                val planId = app.repository.getOrCreateExtraPlan(day)
+                fresh.forEach { app.repository.addLibraryExercise(it, planId) }
+                app.repository.readExercisesByDay(day)
+            } ?: return@launch
+            _state.update { current ->
+                val catalogue = current.catalogue ?: return@update current
+                if (current.day != day) current else current.copy(dayExercises = updated, trained = TrainedMusclesFinder.find(updated, current.library, catalogue))
+            }
+        }
     }
 
     companion object {

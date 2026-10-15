@@ -1,7 +1,7 @@
 'use client';
 // The frame around every page: the sidebar (shadcn Sidebar, which becomes a drawer on a phone), the top bar with the
 // breadcrumb, and the account menu with sign out.
-import { Activity, CalendarCheck, ChevronsUpDown, Dumbbell, LayoutDashboard, LogOut, PersonStanding, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { Activity, CalendarCheck, ChevronsUpDown, ClipboardList, Dumbbell, LayoutDashboard, LogOut, PersonStanding, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -22,6 +22,7 @@ const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/activity/', label: 'Activity', icon: Activity },
   { href: '/body/', label: 'Body', icon: PersonStanding },
   { href: '/library/', label: 'Library', icon: Dumbbell },
+  { href: '/plan-library/', label: 'Plan library', icon: ClipboardList },
   { href: '/team/', label: 'Team', icon: ShieldCheck },
 ];
 

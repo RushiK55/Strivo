@@ -37,7 +37,7 @@ import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import kotlinx.coroutines.launch
 
-/** Creates a plan in the prebuilt library. It is put on a weekday later, from that day's "add plan" screen. */
+/** Creates one of the user's own plans. It is put on a weekday later, from that day's "add plan" screen. */
 @Composable
 fun SavePlanScreen(
     planViewModel: PlanViewModel,
@@ -94,7 +94,7 @@ fun SavePlanScreen(
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                "The plan is saved to your prebuilt plans. Add its exercises next, then put it on any day from that day's \"Add plan\" screen.",
+                "The plan is saved to your plans. Add its exercises next, then put it on any day from that day's \"Add plan\" screen.",
                 color = AppColors.TextSecondary,
                 fontSize = 13.sp,
             )
@@ -127,7 +127,7 @@ fun SavePlanScreen(
             confirmText = "OK",
             onConfirm = { onSaved(plan) },
         ) {
-            Text("Plan '${plan.planName}' has been added to your prebuilt plans.", color = AppColors.TextSecondary)
+            Text("Plan '${plan.planName}' has been added to your plans.", color = AppColors.TextSecondary)
         }
     }
 }

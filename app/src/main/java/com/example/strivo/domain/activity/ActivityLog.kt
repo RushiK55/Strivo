@@ -50,6 +50,10 @@ fun planCreated(plan: Plan, at: Long) =
 fun planDeleted(plan: Plan, at: Long) =
     ActivityEvent(at = at, type = ActivityKind.PlanDeleted, summary = "Deleted plan ${planLabel("\"${plan.planName}\"", plan.planDay)}")
 
+/** The user took a plan from the plan library into their own plans. */
+fun planTaken(name: String, at: Long) =
+    ActivityEvent(at = at, type = ActivityKind.PlanCreated, summary = "Took the plan \"$name\" from the plan library")
+
 fun planCopied(source: Plan, day: String, at: Long) =
     ActivityEvent(at = at, type = ActivityKind.PlanCopied, summary = "Added plan \"${source.planName}\" to $day")
 

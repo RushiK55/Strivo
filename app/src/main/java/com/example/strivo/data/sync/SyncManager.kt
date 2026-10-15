@@ -12,6 +12,7 @@ import com.example.strivo.domain.activity.clientStats
 import com.example.strivo.domain.activity.nutritionByDay
 import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.body.MuscleNotes
+import com.example.strivo.domain.plan.LibraryPlan
 import com.example.strivo.domain.plan.PlanAssignment
 import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
@@ -201,6 +202,7 @@ class SyncManager(
         }
         if (pullProfile()) applied = true
         if (pullLibrary()) applied = true
+        if (pullPlanLibrary()) applied = true
         pullMuscleNotes()
         if (pullAssignedPlans()) applied = true
         if (applied) onCloudDataApplied()
@@ -215,6 +217,21 @@ class SyncManager(
         val snapshot = withTimeout(READ_TIMEOUT_MILLIS) { firestore.collection("library").get(Source.SERVER).await() }
         val exercises = snapshot.documents.mapNotNull { LibraryExercise.fromMap(it.id, it.data ?: emptyMap()) }
         if (exercises.isEmpty()) false else { db.replaceLibrary(exercises); true }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * The plan library an admin publishes (the cloud's planLibrary): plans built from the exercise library, which users add to a day
+     * from the Add plan screen. Like the exercise library: when the cloud has plans they become the phone's plan library, and when it
+     * has none the starter plans that shipped with the app stay. Best effort: it never fails the backup.
+     */
+    private suspend fun pullPlanLibrary(): Boolean = try {
+        val snapshot = withTimeout(READ_TIMEOUT_MILLIS) { firestore.collection("planLibrary").get(Source.SERVER).await() }
+        val plans = snapshot.documents.mapNotNull { LibraryPlan.fromMap(it.id, it.data ?: emptyMap()) }
+        if (plans.isEmpty()) false else { db.replaceLibraryPlans(plans); true }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

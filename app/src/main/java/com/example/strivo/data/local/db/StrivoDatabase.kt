@@ -11,11 +11,13 @@ import com.example.strivo.domain.analytics.ExtraActivity
 import com.example.strivo.domain.analytics.FoodEntry
 import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.LibraryExercise
+import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
 import com.example.strivo.domain.model.countsForRecords
 import com.example.strivo.domain.model.isWork
 import com.example.strivo.domain.model.toJsonString
+import com.example.strivo.domain.plan.LibraryPlan
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -289,6 +291,9 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
 
     fun deletePlan(id: Long): Int {
         val db = writableDatabase
+        // The days this plan was put on keep their copy, which is no longer linked to anything.
+        db.execSQL("UPDATE plans SET sourcePlanId = NULL WHERE sourcePlanId = ?", arrayOf(id))
+        db.execSQL("UPDATE exercises SET sourceId = NULL WHERE sourceId IN (SELECT id FROM exercises WHERE planId = ?)", arrayOf(id))
         // Also delete exercises associated with this plan
         db.delete("exercises", "planId = ?", arrayOf(id.toString()))
         return db.delete("plans", "planId = ?", arrayOf(id.toString()))
@@ -386,13 +391,25 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
     fun updateExercise(exercise: Exercise): Int =
         writableDatabase.update("exercises", exercise.toValues(), "id = ?", arrayOf(exercise.id.toString()))
 
+    /** Links a weekday's exercise to the exercise of the user's plan it was made from (null: unlinks it). */
+    fun setSourceId(id: Long, sourceId: Long?) {
+        val values = ContentValues().apply { if (sourceId != null) put("sourceId", sourceId) else putNull("sourceId") }
+        writableDatabase.update("exercises", values, "id = ?", arrayOf(id.toString()))
+    }
+
     fun resetAllExerciseChecks(): Int {
+        val db = writableDatabase
+        // Clear the sets logged in the previous session; the planned sets/reps/weight stay. The sets of the user's own plans are the
+        // plan itself (every set's weight and reps), so those are kept: they are what each day starts from.
+        db.execSQL(
+            "UPDATE exercises SET setsData = '' WHERE COALESCE(planId, -1) NOT IN (SELECT planId FROM plans WHERE planDay = ?)",
+            arrayOf(PREBUILT_DAY),
+        )
         val values = ContentValues().apply {
             put("isCheck", 0)
-            put("setsData", "") // Clear the sets logged in the previous session; the planned sets/reps/weight stay
             put("restTime", "")
         }
-        return writableDatabase.update("exercises", values, null, null)
+        return db.update("exercises", values, null, null)
     }
 
     fun deleteDailyExercises(): Int =
@@ -525,6 +542,29 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
         try {
             db.delete("library_exercises", null, null)
             exercises.forEach { db.insert("library_exercises", null, it.toValues()) }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // --- Plan library ---
+
+    fun readLibraryPlans(): List<LibraryPlan> =
+        readableDatabase.query("library_plans", null, null, null, null, null, "name COLLATE NOCASE").use { c ->
+            buildList { while (c.moveToNext()) c.toLibraryPlan()?.let { add(it) } }
+        }
+
+    fun libraryPlanCount(): Int =
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM library_plans", null).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+
+    /** Makes the plan library exactly [plans]: the ones given are written and any other is removed, all or nothing. */
+    fun replaceLibraryPlans(plans: List<LibraryPlan>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("library_plans", null, null)
+            plans.forEach { db.insert("library_plans", null, it.toValues()) }
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()

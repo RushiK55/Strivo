@@ -31,8 +31,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Accessibility
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FlipCameraAndroid
+import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Replay
@@ -68,28 +71,50 @@ import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppType
 import com.example.strivo.domain.body.BodyKey
 import com.example.strivo.domain.body.DrawState
+import com.example.strivo.domain.body.MuscleExercises
 import com.example.strivo.domain.body.MuscleLayer
 import com.example.strivo.domain.body.MuscleRole
 import com.example.strivo.domain.body.TrainedMusclesFinder
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.feature.body.gl.BodyGlView
 
 /**
  * "Your body": the 3D body of the account (female or male, as the profile says), with the muscles that the chosen day's training
- * works glowing on it. Pick a day to see what it trains, turn and zoom the body, tap a muscle to read about it and see which of your
- * exercises work it.
+ * works glowing on it. Pick a day to see what it trains, turn and zoom the body (with or without the skin or the skeleton), tap a muscle
+ * to read about it, see which of your exercises work it and add more for it to the day from the exercise library (which is what a
+ * trainer or admin sets up: which muscles an exercise works, and the exercises themselves). It works with no trainer at all.
  */
 @Composable
 fun BodyScreen(onBack: () -> Unit, viewModel: BodyViewModel = viewModel(key = "body_screen")) {
     LaunchedEffect(Unit) { viewModel.load(withModel = true) }
     val ui by viewModel.state.collectAsStateWithLifecycle()
-    BodyContent(ui, onBack, onSelectDay = viewModel::selectDay, onSelect = viewModel::select, onToggleSkin = viewModel::toggleSkin)
+    BodyContent(
+        ui,
+        onBack,
+        onSelectDay = viewModel::selectDay,
+        onSelect = viewModel::select,
+        onToggleSkin = viewModel::toggleSkin,
+        onToggleSkeleton = viewModel::toggleSkeleton,
+        onAddExercise = viewModel::addExercise,
+        onSampleDay = viewModel::addSampleDay,
+    )
 }
 
 /** The screen itself, from a state and what the user does; apart from [BodyScreen] so a preview can show it with made-up data. */
 @Composable
-fun BodyContent(ui: BodyUiState, onBack: () -> Unit, onSelectDay: (String) -> Unit, onSelect: (String?) -> Unit, onToggleSkin: () -> Unit) {
+fun BodyContent(
+    ui: BodyUiState,
+    onBack: () -> Unit,
+    onSelectDay: (String) -> Unit,
+    onSelect: (String?) -> Unit,
+    onToggleSkin: () -> Unit,
+    onToggleSkeleton: () -> Unit,
+    onAddExercise: (LibraryExercise) -> Unit,
+    onSampleDay: () -> Unit,
+) {
     var creditsOpen by remember { mutableStateOf(false) }
+    var musclesOpen by remember { mutableStateOf(false) }
     var glView by remember { mutableStateOf<BodyGlView?>(null) }
     var front by remember { mutableStateOf(true) }
     val catalogue = ui.catalogue
@@ -103,7 +128,7 @@ fun BodyContent(ui: BodyUiState, onBack: () -> Unit, onSelectDay: (String) -> Un
                 ui = ui,
                 onPicked = onSelect,
                 onView = { glView = it },
-                modifier = Modifier.padding(top = 132.dp, bottom = if (ui.selected != null) 310.dp else 168.dp),
+                modifier = Modifier.padding(top = 132.dp, bottom = if (ui.selected != null) 310.dp else if (ui.dayExercises.isEmpty()) 224.dp else 168.dp),
             )
         } else {
             Text(
@@ -135,12 +160,14 @@ fun BodyContent(ui: BodyUiState, onBack: () -> Unit, onSelectDay: (String) -> Un
             DayChips(selected = ui.day, today = ui.today, onSelect = onSelectDay)
         }
 
-        // Right: skin, flip, reset
+        // Right: the muscle list, skin, skeleton, flip, reset
         Column(
-            Modifier.align(Alignment.CenterEnd).padding(end = 10.dp),
+            Modifier.align(Alignment.TopEnd).padding(end = 10.dp, top = 148.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (catalogue != null) RoundButton(Icons.Rounded.FormatListBulleted, "Choose a muscle from the list", active = ui.selected != null) { musclesOpen = true }
             RoundButton(Icons.Rounded.Person, if (ui.skinOn) "Hide the skin" else "Show the skin", active = ui.skinOn, onClick = onToggleSkin)
+            RoundButton(Icons.Rounded.Accessibility, if (ui.skeletonOn) "Hide the skeleton" else "Show the skeleton", active = ui.skeletonOn, onClick = onToggleSkeleton)
             RoundButton(Icons.Rounded.FlipCameraAndroid, "Turn the body round", active = false) {
                 front = !front
                 glView?.showWhole(front)
@@ -161,12 +188,24 @@ fun BodyContent(ui: BodyUiState, onBack: () -> Unit, onSelectDay: (String) -> Un
                 enter = slideInVertically { it / 2 } + fadeIn(),
                 exit = slideOutVertically { it / 2 } + fadeOut(),
             ) {
-                if (selected != null && catalogue != null) MuscleCard(ui, selected.id, onClose = { onSelect(null) })
+                if (selected != null && catalogue != null) MuscleCard(ui, selected.id, onAddExercise, onClose = { onSelect(null) })
             }
             AnimatedVisibility(visible = selected == null && catalogue != null, enter = fadeIn(), exit = fadeOut()) {
-                TrainingSummary(ui)
+                TrainingSummary(ui, onSampleDay)
             }
         }
+    }
+
+    if (musclesOpen && catalogue != null) {
+        MuscleListSheet(
+            catalogue = catalogue,
+            body = ui.body,
+            trained = ui.trained,
+            notes = ui.notes,
+            selected = ui.selected,
+            onPick = { id -> musclesOpen = false; onSelect(id) },
+            onDismiss = { musclesOpen = false },
+        )
     }
 
     if (creditsOpen) CreditsDialog(onClose = { creditsOpen = false })
@@ -219,7 +258,7 @@ private fun BodyGl(ui: BodyUiState, onPicked: (String?) -> Unit, onView: (BodyGl
     LaunchedEffect(view, model, ui.body) { view.setModel(model, ui.body) }
     // A deep muscle lies under the surface ones, so picking one fades them.
     val deep = ui.selected?.let { catalogue.group(it)?.layer == MuscleLayer.Deep } == true
-    LaunchedEffect(view, ui.selected, ui.trained, ui.skinOn, deep) { view.setScene(DrawState(ui.selected, deep, ui.trained), ui.skinOn) }
+    LaunchedEffect(view, ui.selected, ui.trained, ui.skinOn, ui.skeletonOn, deep) { view.setScene(DrawState(ui.selected, deep, ui.trained), ui.skinOn, ui.skeletonOn) }
     LaunchedEffect(view, ui.selected, model) { view.focus(ui.selected) }
     AndroidView(
         factory = { view },
@@ -275,7 +314,7 @@ private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, l
 // ---- What the day trains ----
 
 @Composable
-private fun TrainingSummary(ui: BodyUiState) {
+private fun TrainingSummary(ui: BodyUiState, onSampleDay: () -> Unit) {
     AppCard {
         val main = ui.mainLabels()
         val helper = ui.helperLabels()
@@ -286,7 +325,13 @@ private fun TrainingSummary(ui: BodyUiState) {
         )
         Spacer(Modifier.height(6.dp))
         when {
-            ui.dayExercises.isEmpty() -> Text("Nothing is planned for ${ui.day}. Tap any muscle to read about it.", style = AppType.Body, color = AppColors.TextSecondary)
+            ui.dayExercises.isEmpty() -> {
+                Text("Nothing is planned for ${ui.day}. Tap a muscle to read about it and add exercises for it, or start from a sample day.", style = AppType.Body, color = AppColors.TextSecondary)
+                if (MuscleExercises.sampleDay(ui.day, ui.library).isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    ActionPill("Start with a sample ${ui.day}", onClick = onSampleDay)
+                }
+            }
             ui.trained.isEmpty -> Text(
                 "${ui.dayExercises.size} exercise${if (ui.dayExercises.size == 1) "" else "s"} planned, but their muscles are not known yet. Tap a muscle to read about it.",
                 style = AppType.Body,
@@ -307,16 +352,13 @@ private fun TrainingSummary(ui: BodyUiState) {
 // ---- One muscle ----
 
 @Composable
-private fun MuscleCard(ui: BodyUiState, id: String, onClose: () -> Unit) {
+private fun MuscleCard(ui: BodyUiState, id: String, onAdd: (LibraryExercise) -> Unit, onClose: () -> Unit) {
     val catalogue = ui.catalogue ?: return
     val group = catalogue.group(id) ?: return
     val note = ui.notes[id]
     val role = ui.trained.roleOf(id)
     val uses = remember(id, ui.dayExercises, ui.library) { TrainedMusclesFinder.usesOf(id, ui.dayExercises, ui.library, catalogue) }
-    val usedNames = uses.map { TrainedMusclesFinder.normalise(it.exercise.name) }.toSet()
-    val more = remember(id, ui.library, usedNames) {
-        ui.library.filter { id in it.primaryMuscles && TrainedMusclesFinder.normalise(it.name) !in usedNames }.take(4).map { it.name }
-    }
+    val choices = remember(id, ui.library, ui.dayExercises) { MuscleExercises.forMuscle(id, ui.library, ui.dayExercises).filter { !it.inDay } }
     AppCard(modifier = Modifier.heightIn(max = 330.dp)) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Row(verticalAlignment = Alignment.Top) {
@@ -359,11 +401,32 @@ private fun MuscleCard(ui: BodyUiState, id: String, onClose: () -> Unit) {
                     }
                 }
             }
-            if (more.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                Text("MORE FOR ${group.label.uppercase()}", style = AppType.Overline, color = AppColors.Accent)
-                Spacer(Modifier.height(4.dp))
-                Text(more.joinToString(", "), style = AppType.Caption, color = AppColors.TextSecondary)
+            Spacer(Modifier.height(12.dp))
+            Text("ADD FOR ${group.label.uppercase()} · ${ui.day.uppercase()}", style = AppType.Overline, color = AppColors.Accent)
+            Spacer(Modifier.height(4.dp))
+            if (choices.isEmpty()) {
+                Text(
+                    if (ui.library.isEmpty()) "The exercise library is empty." else "Every exercise in the library for this muscle is already in the ${ui.day} plan, or none is set for it yet.",
+                    style = AppType.Caption,
+                    color = AppColors.TextSecondary,
+                )
+            } else {
+                for (choice in choices) {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(choice.exercise.name, style = AppType.BodyStrong, color = AppColors.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOf(choice.exercise.equipment, "${choice.exercise.defaultSets} × ${choice.exercise.defaultReps}", if (choice.role == MuscleRole.Helper) "helps" else "")
+                                    .filter { it.isNotBlank() }.joinToString(" · "),
+                                style = AppType.Caption,
+                                color = AppColors.TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        ActionPill("Add", icon = true, onClick = { onAdd(choice.exercise) }, description = "Add ${choice.exercise.name} to ${ui.day}")
+                    }
+                }
             }
         }
     }
@@ -374,6 +437,27 @@ private fun describeSets(exercise: Exercise): String {
     val weight = exercise.weight.toDoubleOrNull() ?: 0.0
     val kg = if (weight > 0) " · ${if (weight % 1.0 == 0.0) weight.toInt() else weight} kg" else ""
     return "${exercise.sets} × ${exercise.reps}$kg"
+}
+
+/** A small rounded button: "Add" with a plus, or a line of text. */
+@Composable
+private fun ActionPill(text: String, onClick: () -> Unit, icon: Boolean = false, description: String = text) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(AppColors.AccentSoft)
+            .border(BorderStroke(1.dp, AppColors.Accent), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description }
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon) {
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, style = AppType.BodyStrong, color = AppColors.Accent, maxLines = 1)
+    }
 }
 
 @Composable

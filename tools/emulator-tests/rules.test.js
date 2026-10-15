@@ -19,6 +19,18 @@ const goodExercise = (over = {}) => ({
   ...over,
 });
 
+const goodPlan = (over = {}) => ({
+  name: 'Push Day',
+  description: 'Chest, shoulders and triceps.',
+  level: 'Beginner',
+  active: true,
+  exercises: [{ name: 'Bench Press', sets: 4, reps: 8, weightKg: 40, dropSets: 0, notes: '' }],
+  createdAt: 1,
+  updatedAt: 1,
+  updatedBy: 'adminUid',
+  ...over,
+});
+
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'strivo-test',
@@ -45,6 +57,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'users/alice/history/1'), { name: 'Bench Press' });
     await setDoc(doc(db, 'users/bob/events/1'), { type: 'plan_created', at: 1 });
     await setDoc(doc(db, 'library/bench'), goodExercise());
+    await setDoc(doc(db, 'planLibrary/push-day'), goodPlan());
   });
 });
 
@@ -114,6 +127,34 @@ test('any signed-in user reads the library but cannot change it', async () => {
   await assertFails(setDoc(doc(db, 'library/new'), goodExercise()));
   await assertFails(setDoc(doc(db, 'library/bench'), goodExercise({ name: 'Hacked' })));
   await assertFails(deleteDoc(doc(db, 'library/bench')));
+});
+
+// --- The plan library ---
+
+test('any signed-in user reads the plan library but cannot change it, and a signed-out visitor cannot read it', async () => {
+  const db = as('alice');
+  await assertSucceeds(getDoc(doc(db, 'planLibrary/push-day')));
+  await assertSucceeds(getDocs(collection(db, 'planLibrary')));
+  await assertFails(setDoc(doc(db, 'planLibrary/new-plan'), goodPlan({ updatedBy: 'alice' })));
+  await assertFails(setDoc(doc(db, 'planLibrary/push-day'), { name: 'Hacked' }, { merge: true }));
+  await assertFails(deleteDoc(doc(db, 'planLibrary/push-day')));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'planLibrary/push-day')));
+});
+
+test('an admin manages the plan library, and the shape of a plan is checked', async () => {
+  const db = as('adminUid');
+  await assertSucceeds(setDoc(doc(db, 'planLibrary/pull-day'), goodPlan({ name: 'Pull Day' })));
+  await assertSucceeds(setDoc(doc(db, 'planLibrary/pull-day'), { active: false, updatedAt: 2, updatedBy: 'adminUid' }, { merge: true })); // hiding
+  await assertSucceeds(deleteDoc(doc(db, 'planLibrary/pull-day')));
+  await assertFails(setDoc(doc(db, 'planLibrary/a'), goodPlan({ name: '' })));
+  await assertFails(setDoc(doc(db, 'planLibrary/b'), goodPlan({ name: 'x'.repeat(61) })));
+  await assertFails(setDoc(doc(db, 'planLibrary/c'), goodPlan({ exercises: [] })));
+  await assertFails(setDoc(doc(db, 'planLibrary/d'), goodPlan({ exercises: Array.from({ length: 31 }, () => ({ name: 'Squat' })) })));
+  await assertFails(setDoc(doc(db, 'planLibrary/e'), goodPlan({ active: 'yes' })));
+  await assertFails(setDoc(doc(db, 'planLibrary/f'), goodPlan({ updatedBy: 'someoneElse' })));
+  await assertFails(setDoc(doc(db, 'planLibrary/g'), goodPlan({ surprise: true })));
+  await assertFails(setDoc(doc(db, 'planLibrary/Not A Slug'), goodPlan()));
+  await assertFails(setDoc(doc(db, 'planLibrary/h'), { name: 'Only a name' }));
 });
 
 // --- Admins ---

@@ -10,7 +10,7 @@ import com.example.strivo.domain.activity.withoutFoodName
  */
 internal object Schema {
     /** Bump when a table changes, and add a step for it to [upgrade]. */
-    const val VERSION = 18
+    const val VERSION = 19
 
     /** The tables demo data writes to, which carry the isDemo mark. */
     val DemoTables = listOf("workout_sessions", "exercises", "plans", "food_log", "activity_log", "weight_log")
@@ -43,6 +43,18 @@ internal object Schema {
           updatedAt INTEGER NOT NULL,
           primaryMuscles TEXT NOT NULL DEFAULT '',
           secondaryMuscles TEXT NOT NULL DEFAULT ''
+        )"""
+
+    /** The plan library: a copy of the plans admins publish (or the starter plans), read-only on the phone. The exercises are one JSON text. */
+    private const val CREATE_LIBRARY_PLANS = """
+        CREATE TABLE IF NOT EXISTS library_plans (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL,
+          level TEXT NOT NULL,
+          exercises TEXT NOT NULL,
+          active INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL
         )"""
 
     private const val CREATE_ACTIVITY_LOG = """
@@ -126,8 +138,10 @@ internal object Schema {
         db.execSQL(CREATE_ACTIVITY_LOG)
         db.execSQL(CREATE_ACTIVITY_EVENTS)
         db.execSQL(CREATE_LIBRARY)
+        db.execSQL(CREATE_LIBRARY_PLANS)
         addDemoColumns(db)
         addPlannedDropSets(db)
+        addPlanLinks(db)
         createSyncObjects(db)
     }
 
@@ -213,6 +227,11 @@ internal object Schema {
         // The activity lines an older version wrote with a food's name in them are rewritten without it (and uploaded again
         // by the sync, which sees the updates), because the trainer's dashboard may read those lines but not what was eaten.
         if (oldVersion < 17) removeFoodNamesFromEvents(db)
+        // Plans know where they came from and which of the user's plans a weekday's plan was made from; the plan library is new.
+        if (oldVersion < 19) {
+            db.execSQL(CREATE_LIBRARY_PLANS)
+            addPlanLinks(db)
+        }
     }
 
     private fun removeFoodNamesFromEvents(db: SQLiteDatabase) {
@@ -232,6 +251,16 @@ internal object Schema {
 
     /** How many drop sets a plan adds after an exercise's working sets (see Exercise.dropSets). */
     private fun addPlannedDropSets(db: SQLiteDatabase) = addColumnIfMissing(db, "exercises", "dropSets", "INTEGER NOT NULL DEFAULT 0")
+
+    /**
+     * Links a weekday's plan to the user's plan it was made from (plans.sourcePlanId, exercises.sourceId), and marks where a user's plan
+     * came from (plans.origin). The links are part of the rows, so they go to the cloud with them and are still there on a new phone.
+     */
+    private fun addPlanLinks(db: SQLiteDatabase) {
+        addColumnIfMissing(db, "plans", "sourcePlanId", "INTEGER")
+        addColumnIfMissing(db, "plans", "origin", "TEXT NOT NULL DEFAULT ''")
+        addColumnIfMissing(db, "exercises", "sourceId", "INTEGER")
+    }
 
     private fun addColumnIfMissing(db: SQLiteDatabase, table: String, column: String, definition: String) {
         val has = db.rawQuery("PRAGMA table_info($table)", null).use { c ->

@@ -16,6 +16,7 @@ const BUILD_DIR = '.test-build';
 const SITE_DIR = path.join(ADMIN_DIR, BUILD_DIR);
 const FIREBASE_JSON = JSON.parse(fs.readFileSync(path.join(__dirname, '../../firebase.json'), 'utf8'));
 const SEED = JSON.parse(fs.readFileSync(path.join(ADMIN_DIR, 'seed/library.json'), 'utf8'));
+const PLANS = JSON.parse(fs.readFileSync(path.join(ADMIN_DIR, 'seed/plan_library.json'), 'utf8'));
 const NOW = Date.now();
 const MIN = 60_000;
 
@@ -176,6 +177,14 @@ ${(await text()).slice(0, 1800)}`);
 }
 /** Dialogs fade out for a moment after they close; a click in that moment would land on the backdrop. */
 const waitForNoDialog = () => page.waitForFunction(() => !document.querySelector('[role="dialog"], [role="alertdialog"]'), { timeout: 15_000 });
+/** Opens a client from the Clients page by clicking their name: the page is not reloaded (a full load right after a page that wrote waits for the emulator to let go of its old connection). */
+async function openClient(name) {
+  await clickText('nav[aria-label="Main"] a', 'Clients');
+  await waitForText(name);
+  const link = await page.waitForFunction((n) => [...document.querySelectorAll('a')].find((a) => a.href.includes('/clients/view') && a.innerText.includes(n)), { timeout: 15_000 }, name);
+  await link.asElement().click();
+}
+
 const waitForGone = (t, timeout = 15_000) => page.waitForFunction((s) => !document.body.innerText.includes(s), { timeout }, t);
 
 /** Clicks the first visible element of a kind whose text matches. */
@@ -365,7 +374,7 @@ test('a client page shows attendance, strength, body weight, intake, workouts an
   await waitForText('Keep wrists straight');
   body = await text();
   assert.ok(body.includes('4 × 8 + 1 drop @ 60.0 kg') || body.includes('4 × 8 + 1 drop @ 60 kg'));
-  assert.ok(body.includes('Library'), 'the library copy of the plan is labelled');
+  assert.ok(body.includes('Their plan') && body.includes('Made by them'), "the client's own plan is labelled, and says they made it");
 
   await clickText('button[role="tab"]', 'Activity');
   await waitForText('Created plan "Push Day" for Monday');
@@ -587,6 +596,133 @@ test('the library: add, validate, hide, import the starter set and delete', asyn
   await waitForText('Old Move deleted');
   await waitForText(`0 of ${SEED.length + 1} exercises`);
   await waitForNoDialog();
+});
+
+test('the plan library: import the starter plans, build a plan from the exercise library, hide it, send one to a client and delete it', async () => {
+  await clickText('nav[aria-label="Main"] a', 'Plan library');
+  await waitForText('Ready-made plans, built from the exercise library.');
+  await waitForText('The plan library is empty.');
+  await assertNoLeaks('the plan library');
+
+  // The starter plans are added in one go, and only those that are not there yet.
+  await clickText('button', 'Import starter plans');
+  await waitForText(`Add ${PLANS.length} starter plans`);
+  await clickText('[role="alertdialog"] button', 'Import');
+  await waitForText(`${PLANS.length} plans imported`);
+  await waitForNoDialog();
+  await waitForText('Push Day');
+  await waitForText('Bench Press'); // its exercises are listed
+  await assertNoLeaks('the plan library');
+  await shot('plan-library');
+
+  // A new plan is built from the exercise library. An empty form says what is missing instead of sending it to Firestore.
+  await clickText('button', 'New plan');
+  await page.waitForSelector('[role="dialog"] input[name="name"]');
+  await clickText('[role="dialog"] button', 'Save plan');
+  await waitForText('Give the plan a name.');
+  await waitForText('Add at least one exercise.');
+  await page.type('[role="dialog"] input[name="name"]', 'Tester Plan');
+  const squat = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] select[aria-label="Add from the exercise library"] option')].find((o) => o.textContent === 'Squat')?.value);
+  assert.ok(squat, 'the exercise library is offered to build the plan from');
+  await page.select('[role="dialog"] select[aria-label="Add from the exercise library"]', squat);
+  await waitForGone('Add at least one exercise.');
+  // What is in the plan is not offered again; a second exercise can be moved above the first.
+  const picker = '[role="dialog"] select[aria-label="Add from the exercise library"]';
+  const offered = () => page.$$eval(picker + ' option', (options) => options.map((o) => o.textContent));
+  assert.ok(!(await offered()).includes('Squat'), 'an exercise already in the plan is not in the list to add from');
+  assert.ok((await offered()).includes('Lunge'));
+  await page.select(picker, await page.evaluate((p) => [...document.querySelectorAll(p + ' option')].find((o) => o.textContent === 'Lunge').value, picker));
+  assert.deepEqual(await page.$$eval('[role="dialog"] input[name="exerciseName"]', (inputs) => inputs.map((i) => i.value)), ['Squat', 'Lunge']);
+  // Dragged by its handle, like in the app: the second row is picked up and dropped on the first.
+  const handle = await (await page.$('[role="dialog"] button[aria-label="Drag exercise 2 to move it"]')).boundingBox();
+  const first = await (await page.$('[role="dialog"] input[aria-label="Exercise 1 name"]')).boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y - 40, { steps: 5 });
+  await page.mouse.move(first.x + 20, first.y + first.height / 2, { steps: 8 });
+  await page.mouse.up();
+  assert.deepEqual(await page.$$eval('[role="dialog"] input[name="exerciseName"]', (inputs) => inputs.map((i) => i.value)), ['Lunge', 'Squat'], 'the exercises can be put in order');
+  await shot('plan-library-form');
+  await clickText('[role="dialog"] button', 'Save plan');
+  await waitForText('Tester Plan added');
+  await waitForNoDialog();
+
+  let stored = [];
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    stored = (await getDocs(collection(ctx.firestore(), 'planLibrary'))).docs.map((d) => ({ id: d.id, ...d.data() }));
+  });
+  const created = stored.find((d) => d.id === 'tester-plan');
+  assert.ok(created, 'the new plan is stored; the plan library has ' + JSON.stringify(stored.map((d) => d.id)));
+  assert.equal(stored.length, PLANS.length + 1);
+  assert.deepEqual(created.exercises.map((e) => e.name), ['Lunge', 'Squat'], 'saved in the order they were put in');
+  assert.equal(created.active, true);
+  assert.equal(created.updatedBy, users.admin);
+
+  // Hiding a plan keeps it here and takes it out of the app.
+  await page.click('button[aria-label="Actions for Tester Plan"]');
+  await clickText('[role="menuitem"]', 'Hide from users');
+  await waitForText('Tester Plan is now hidden from users');
+
+  // A trainer can start a plan to send from the plan library.
+  await openClient('Alice Active');
+  await waitForText('Workouts per week');
+  await clickText('button[role="tab"]', 'Plans');
+  await waitForText('Plans you sent');
+  await clickText('button', 'Send a plan');
+  await page.waitForSelector('[role="dialog"] input[name="planName"]');
+  const push = await page.evaluate(() => [...document.querySelectorAll('[role="dialog"] select option')].find((o) => o.textContent.startsWith('Push Day (6 exercises'))?.value);
+  assert.ok(push, 'the plan library is offered to start from (a hidden plan is not)');
+  assert.ok(!(await text()).includes('Tester Plan ('), 'a plan hidden from users is not offered either');
+  await page.select('[role="dialog"] select', push);
+  assert.equal(await page.$eval('input[name="planName"]', (e) => e.value), 'Push Day');
+  assert.equal(await page.$$eval('[role="dialog"] input[name="exerciseName"]', (inputs) => inputs.length), 6);
+  await clickText('[role="dialog"] button', 'Cancel');
+  await waitForNoDialog();
+
+  // Deleting asks first.
+  await clickText('nav[aria-label="Main"] a', 'Plan library');
+  await page.waitForSelector('button[aria-label="Actions for Tester Plan"]');
+  await page.click('button[aria-label="Actions for Tester Plan"]');
+  await clickText('[role="menuitem"]', 'Delete');
+  await waitForText('Delete "Tester Plan" from the plan library?');
+  await clickText('[role="alertdialog"] button', 'Delete');
+  await waitForText('Tester Plan deleted');
+  await waitForNoDialog();
+  await page.waitForFunction(() => !document.querySelector('[data-sonner-toast]'), { timeout: 15_000 }); // the messages in the corner are gone before the next page
+});
+
+test('the trainer sees what a client did to an accepted plan: where it came from, set by set, and what they changed', async () => {
+  // Carol accepted "Carol Push" (3 x 10 at 60 kg), put it on Monday, and then made the second set heavier and the last set shorter.
+  const sets = JSON.stringify([{ weight: 60, reps: 10 }, { weight: 65, reps: 10 }, { weight: 60, reps: 8 }]);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const c = `users/${users.carol}`;
+    await setDoc(doc(db, `${c}/assigned/acc1`), {
+      planName: 'Carol Push', day: 'Monday', note: '', status: 'accepted', sentAt: NOW - DAY_MS, sentBy: users.admin, sentByName: 'Coach Sam', answeredAt: NOW - 3_600_000,
+      exercises: [{ name: 'Bench Press', sets: 3, reps: 10, weightKg: 60, dropSets: 0, notes: '' }],
+    });
+    await setDoc(doc(db, `${c}/assigned/acc2`), {
+      planName: 'Untouched', day: 'Tuesday', note: '', status: 'accepted', sentAt: NOW - 2 * DAY_MS, sentBy: users.admin, sentByName: 'Coach Sam', answeredAt: NOW - 2 * 3_600_000,
+      exercises: [{ name: 'Squat', sets: 3, reps: 5, weightKg: 80, dropSets: 0, notes: '' }],
+    });
+    await setDoc(doc(db, `${c}/plans/1`), { planId: 1, planName: 'Carol Push', planDay: 'Prebuilt', origin: 'trainer:acc1', isDemo: 0 });
+    await setDoc(doc(db, `${c}/plans/2`), { planId: 2, planName: 'Carol Push', planDay: 'Monday', sourcePlanId: 1, origin: '', isDemo: 0 });
+    await setDoc(doc(db, `${c}/plans/3`), { planId: 3, planName: 'Untouched', planDay: 'Prebuilt', origin: 'trainer:acc2', isDemo: 0 });
+    await setDoc(doc(db, `${c}/exercises/1`), { id: 1, planId: 1, name: 'Bench Press', weight: '65.0', sets: '3', reps: '10', notes: '', dropSets: 0, sortOrder: 0, setsData: sets });
+    await setDoc(doc(db, `${c}/exercises/2`), { id: 2, planId: 2, sourceId: 1, name: 'Bench Press', weight: '65.0', sets: '3', reps: '10', notes: '', dropSets: 0, sortOrder: 0, setsData: sets });
+    await setDoc(doc(db, `${c}/exercises/3`), { id: 3, planId: 3, name: 'Squat', weight: '80.0', sets: '3', reps: '5', notes: '', dropSets: 0, sortOrder: 0, setsData: '' });
+  });
+  await openClient('Carol Newcomer');
+  await clickText('button[role="tab"]', 'Plans');
+  await waitForText('They changed:');
+  const body = await text();
+  assert.ok(body.includes('Bench Press: set 2: 60 → 65 kg, set 3: 10 → 8 reps'), 'what changed, set by set');
+  assert.ok(body.includes('Their copy is as you sent it.'), 'a plan the client left alone says so');
+  assert.ok(body.includes('60 × 10 · 65 × 10 · 60 × 8'), 'their plan shows the sets one by one once they differ');
+  assert.ok(body.includes('Sent by a trainer') && body.includes('Their plan'), 'where their plan came from');
+  assert.ok(body.includes('Kept in their plan'), 'the day it is on is linked to their plan');
+  await assertNoLeaks('the plans tab');
+  await shot('client-plan-changes');
 });
 
 test('the body page: a full-page 3D body with a skin over the muscles, a three-line button for the controls and credits in the corners; pick a muscle, the skin comes off and a box beside it, joined by a line, explains it and shows its exercises', async () => {

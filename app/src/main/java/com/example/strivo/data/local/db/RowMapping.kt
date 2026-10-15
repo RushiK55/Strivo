@@ -9,6 +9,7 @@ import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.WorkoutSession
+import com.example.strivo.domain.plan.LibraryPlan
 import com.example.strivo.domain.model.parseExerciseSets
 import com.example.strivo.domain.model.toJsonString
 import java.time.LocalDateTime
@@ -42,12 +43,16 @@ internal fun Plan.toValues() = ContentValues().apply {
     planId?.let { put("planId", it) }
     put("planName", planName)
     put("planDay", planDay)
+    if (sourcePlanId != null) put("sourcePlanId", sourcePlanId) else putNull("sourcePlanId")
+    put("origin", origin)
 }
 
 internal fun Cursor.toPlan() = Plan(
     planId = getLong(getColumnIndexOrThrow("planId")),
     planName = getStringOrEmpty("planName"),
     planDay = getStringOrEmpty("planDay"),
+    sourcePlanId = getColumnIndexOrThrow("sourcePlanId").let { if (isNull(it)) null else getLong(it) },
+    origin = getStringOrEmpty("origin"),
 )
 
 internal fun Exercise.toValues() = ContentValues().apply {
@@ -66,6 +71,7 @@ internal fun Exercise.toValues() = ContentValues().apply {
     put("setsData", setsList.toJsonString())
     if (sortOrder >= 0) put("sortOrder", sortOrder)
     put("dropSets", dropSets)
+    if (sourceId != null) put("sourceId", sourceId) else putNull("sourceId")
 }
 
 internal fun Cursor.toExercise() = Exercise(
@@ -84,6 +90,7 @@ internal fun Cursor.toExercise() = Exercise(
     setsList = parseExerciseSets(getStringOrEmpty("setsData")),
     sortOrder = getIntOrZero("sortOrder"),
     dropSets = getIntOrZero("dropSets"),
+    sourceId = getColumnIndexOrThrow("sourceId").let { if (isNull(it)) null else getLong(it) },
 )
 
 internal fun Cursor.toSession() = WorkoutSession(
@@ -115,6 +122,26 @@ internal fun Cursor.toActivityEvent() = ActivityEvent(
     type = getStringOrEmpty("type"),
     summary = getStringOrEmpty("summary"),
 )
+
+internal fun LibraryPlan.toValues() = ContentValues().apply {
+    put("id", id)
+    put("name", name)
+    put("description", description)
+    put("level", level)
+    put("exercises", exercisesJson())
+    put("active", if (active) 1 else 0)
+    put("updatedAt", updatedAt)
+}
+
+internal fun Cursor.toLibraryPlan(): LibraryPlan? = LibraryPlan(
+    id = getStringOrEmpty("id"),
+    name = getStringOrEmpty("name"),
+    description = getStringOrEmpty("description"),
+    level = getStringOrEmpty("level"),
+    exercises = LibraryPlan.exercisesFromJson(getStringOrEmpty("exercises")),
+    active = getIntOrZero("active") == 1,
+    updatedAt = getLong(getColumnIndexOrThrow("updatedAt")),
+).takeIf { it.id.isNotEmpty() && it.name.isNotEmpty() && it.exercises.isNotEmpty() }
 
 internal fun LibraryExercise.toValues() = ContentValues().apply {
     put("id", id)

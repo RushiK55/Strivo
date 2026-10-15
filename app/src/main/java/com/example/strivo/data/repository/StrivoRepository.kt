@@ -16,6 +16,7 @@ import com.example.strivo.domain.activity.planCopied
 import com.example.strivo.domain.activity.planCreated
 import com.example.strivo.domain.activity.planDeleted
 import com.example.strivo.domain.activity.planOfferAnswered
+import com.example.strivo.domain.activity.planTaken
 import com.example.strivo.domain.activity.profileUpdated
 import com.example.strivo.domain.activity.weightLogged
 import com.example.strivo.domain.activity.workoutFinished
@@ -29,11 +30,16 @@ import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
+import com.example.strivo.domain.model.TRAINER_ORIGIN
 import com.example.strivo.domain.model.WorkoutSession
+import com.example.strivo.domain.plan.LibraryPlan
 import com.example.strivo.domain.plan.PlanAssignment
 import com.example.strivo.domain.plan.PlanOffer
 import com.example.strivo.domain.plan.ReceivedPlan
+import com.example.strivo.domain.plan.freshCopyFor
 import com.example.strivo.domain.plan.groupOffers
+import com.example.strivo.domain.plan.isPlanned
+import com.example.strivo.domain.plan.withPlanOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -81,23 +87,30 @@ class StrivoRepository(
 
     suspend fun deleteEmptyExtraPlans(): Int = io { db.deleteEmptyExtraPlans(EXTRA_PLAN_NAME) }
 
-    /** Copies [source] and its exercises (fresh, nothing ticked off) onto [day]; returns the new plan's id. */
-    suspend fun copyPlanToDay(source: Plan, day: String): Long = io {
-        val newId = db.createPlan(Plan(planName = source.planName, planDay = day))
-        db.readExercisesByPlan(source.planId ?: -1L).forEach { exercise ->
-            db.createExercise(
-                exercise.copy(
-                    id = null,
-                    planId = newId,
-                    isCheck = false,
-                    dateTime = "",
-                    sortOrder = -1,
-                    setsList = exercise.setsList.map { it.copy(isCompleted = false, isStarted = false) },
-                )
-            )
-        }
-        record(planCopied(source, day, now()))
-        newId
+    /**
+     * Puts one of the user's own plans on [day]: a copy of it and its exercises (fresh, nothing ticked off) that stays linked to the
+     * plan. What the user changes on the day is kept in their plan, and the plan is what the day starts from each morning.
+     * Returns the new plan's id.
+     */
+    suspend fun copyPlanToDay(source: Plan, day: String): Long = io { putPlanOnDay(source, day, log = true) }
+
+    private fun putPlanOnDay(source: Plan, day: String, log: Boolean): Long {
+        val sourceId = source.planId ?: return -1L
+        val newId = db.createPlan(Plan(planName = source.planName, planDay = day, sourcePlanId = sourceId))
+        db.readExercisesByPlan(sourceId).filter { it.isPlanned }.forEach { db.createExercise(it.freshCopyFor(newId)) }
+        if (log) record(planCopied(source, day, now()))
+        return newId
+    }
+
+    /**
+     * Puts a plan of the plan library on [day]. It becomes one of the user's own plans first (once: a plan taken before is used again,
+     * with the changes the user made to it), and the day gets a linked copy of that. Returns the day's plan id.
+     */
+    suspend fun addLibraryPlanToDay(plan: LibraryPlan, day: String): Long = io {
+        val own = db.readAllPlans().firstOrNull { it.isPrebuilt && it.origin == plan.origin }
+            ?: db.getPlan(db.importPlan(Plan(planName = plan.name, planDay = PREBUILT_DAY, origin = plan.origin), plan.exercises, planTaken(plan.name, now())))
+            ?: return@io -1L
+        putPlanOnDay(own, day, log = true)
     }
 
     /**
@@ -118,7 +131,10 @@ class StrivoRepository(
         val fresh = offer.plans.filter { it.id !in received }
         if (fresh.isEmpty()) return@io 0
         fresh.forEach { assignment ->
-            val planId = db.importPlan(Plan(planName = assignment.planName, planDay = assignment.day), assignment.exercises, null)
+            // It becomes one of the user's own plans, which they can add to any day from the Add plan screen; when the trainer chose a
+            // weekday it is put there too, linked, so the user's changes on that day are kept in the plan (and the trainer sees them).
+            val planId = db.importPlan(Plan(planName = assignment.planName, planDay = PREBUILT_DAY, origin = TRAINER_ORIGIN + assignment.id), assignment.exercises, null)
+            if (assignment.day != PREBUILT_DAY) db.getPlan(planId)?.let { putPlanOnDay(it, assignment.day, log = false) }
             prefs.addReceivedPlan(ReceivedPlan.from(assignment, planId, now()))
         }
         prefs.addPendingAnswers(fresh.associate { it.id to PlanAssignment.STATUS_ACCEPTED })
@@ -147,16 +163,77 @@ class StrivoRepository(
     suspend fun readAllExercises(): List<Exercise> = io { db.readAllExercises() }
 
     suspend fun createExercise(exercise: Exercise, fromLibrary: Boolean = false): Long = io {
-        db.createExercise(exercise).also { record(exerciseAdded(exercise, db.getPlan(exercise.planId), now(), fromLibrary)) }
+        db.createExercise(exercise).also { id ->
+            addToUsersPlan(id, exercise)
+            record(exerciseAdded(exercise, db.getPlan(exercise.planId), now(), fromLibrary))
+        }
     }
 
     suspend fun deleteExercise(id: Long) = io {
         val exercise = db.getExercise(id)
         db.deleteExercise(id)
-        exercise?.let { record(exerciseRemoved(it, db.getPlan(it.planId), now())) }
+        exercise?.let {
+            removeFromUsersPlan(it)
+            record(exerciseRemoved(it, db.getPlan(it.planId), now()))
+        }
     }
 
-    suspend fun moveExerciseToPlan(id: Long, targetPlanId: Long) = io { db.moveExerciseToPlan(id, targetPlanId) }
+    suspend fun moveExerciseToPlan(id: Long, targetPlanId: Long) = io {
+        val exercise = db.getExercise(id)
+        exercise?.let { removeFromUsersPlan(it) }
+        db.moveExerciseToPlan(id, targetPlanId)
+        db.setSourceId(id, null)
+        db.getExercise(id)?.let { addToUsersPlan(id, it) }
+    }
+
+    // The plan on a day is linked to the user's own plan it was made from (Plan.sourcePlanId). These keep the two the same: what is
+    // added to, taken out of or changed in the day's plan is done to the user's plan too, and each morning the day starts from it.
+
+    /** The id of the user's plan that [planId] (a weekday's plan) was made from, when that plan is still there. */
+    private fun usersPlanOf(planId: Long): Long? =
+        db.getPlan(planId)?.sourcePlanId?.takeIf { db.getPlan(it) != null }
+
+    /** An exercise added to a day's plan is added to the user's plan too, and linked to it. */
+    private fun addToUsersPlan(id: Long, exercise: Exercise) {
+        if (!exercise.isPlanned || exercise.sourceId != null) return
+        val usersPlan = usersPlanOf(exercise.planId) ?: return
+        val added = db.createExercise(exercise.copy(id = id).freshCopyFor(usersPlan).copy(sourceId = null))
+        db.setSourceId(id, added)
+    }
+
+    private fun removeFromUsersPlan(exercise: Exercise) {
+        val source = exercise.sourceId ?: return
+        if (exercise.isPlanned && usersPlanOf(exercise.planId) != null) db.deleteExercise(source)
+    }
+
+    /** What an exercise plans on a day (every set's weight and reps, its name, its notes) is written to the user's plan. */
+    private fun keepUsersPlanInStep(exercise: Exercise) {
+        val source = exercise.sourceId ?: return
+        if (!exercise.isPlanned || usersPlanOf(exercise.planId) == null) return
+        db.getExercise(source)?.withPlanOf(exercise)?.let { db.updateExercise(it) }
+    }
+
+    /**
+     * Each morning a day starts again from the user's plan it was made from: the weights and reps the plan holds, an exercise the
+     * user added to the plan since, and none that was taken out. (Changes made on a day reach the plan at once; this is how a change to
+     * the plan itself reaches the days.)
+     */
+    private fun startDaysFromUsersPlans() {
+        val plans = db.readAllPlans()
+        val own = plans.filter { it.isPrebuilt }.associateBy { it.planId }
+        for (day in plans.filter { it.sourcePlanId != null && !it.isPrebuilt }) {
+            val dayId = day.planId ?: continue
+            val usersPlan = own[day.sourcePlanId]?.planId ?: continue
+            val planned = db.readExercisesByPlan(usersPlan)
+            val onDay = db.readExercisesByPlan(dayId).filter { it.isPlanned }
+            planned.forEach { wanted ->
+                val mine = onDay.firstOrNull { it.sourceId == wanted.id }
+                if (mine == null) db.createExercise(wanted.freshCopyFor(dayId)) else mine.withPlanOf(wanted)?.let { db.updateExercise(it) }
+            }
+            val kept = planned.mapNotNull { it.id }.toSet()
+            onDay.filter { it.sourceId != null && it.sourceId !in kept }.forEach { exercise -> exercise.id?.let { db.deleteExercise(it) } }
+        }
+    }
 
     /** Adds a fresh copy of [exercise] (planned sets / reps / weight, nothing logged) to the end of another plan. */
     suspend fun copyExerciseToPlan(exercise: Exercise, targetPlanId: Long): Long = io {
@@ -169,7 +246,10 @@ class StrivoRepository(
             sortOrder = -1,
             setsList = emptyList(),
         )
-        db.createExercise(copy).also { record(exerciseAdded(copy, db.getPlan(targetPlanId), now())) }
+        db.createExercise(copy).also { id ->
+            addToUsersPlan(id, copy)
+            record(exerciseAdded(copy, db.getPlan(targetPlanId), now()))
+        }
     }
 
     /** Adds a library exercise to a plan with its suggested sets, reps and weight. */
@@ -212,6 +292,7 @@ class StrivoRepository(
     /** Saves the exercise and keeps the history table in sync with its checked state. */
     suspend fun updateExercise(exercise: Exercise) = io {
         db.updateExercise(exercise)
+        keepUsersPlanInStep(exercise)
         // One history row per exercise per day: replace today's row instead of piling up copies.
         db.removeFromHistory(exercise.name, nowIso())
         if (exercise.isCheck) db.addToHistory(exercise)
@@ -222,6 +303,7 @@ class StrivoRepository(
         if (prefs.consumeDailyReset()) {
             db.resetAllExerciseChecks()
             db.deleteDailyExercises()
+            startDaysFromUsersPlans()
         }
     }
 
@@ -344,6 +426,16 @@ class StrivoRepository(
 
     /** The exercises users can browse: the ones an admin has not hidden. */
     suspend fun readLibrary(): List<LibraryExercise> = io { db.readLibrary().filter { it.active } }
+
+    // --- Plan library ---
+
+    /** The plans users can browse: the ones an admin has not hidden. */
+    suspend fun readLibraryPlans(): List<LibraryPlan> = io { db.readLibraryPlans().filter { it.active } }
+
+    /** Puts the starter plans in place on a phone that has none yet; the cloud's plan library replaces them when it arrives. */
+    suspend fun seedPlanLibraryIfEmpty(starter: List<LibraryPlan>) = io {
+        if (db.libraryPlanCount() == 0 && starter.isNotEmpty()) db.replaceLibraryPlans(starter)
+    }
 
     /** Puts the starter library in place on a phone that has none yet; the cloud's library replaces it when it arrives. */
     suspend fun seedLibraryIfEmpty(starter: List<LibraryExercise>) = io {

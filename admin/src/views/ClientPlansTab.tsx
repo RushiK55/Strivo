@@ -1,6 +1,7 @@
 'use client';
-// A client's plans: what the trainer sent them (and whether it reached the app), and the plans in their app.
-// Sending a plan is the one thing a trainer writes for a client; it lands in users/{uid}/assigned and the app adds it.
+// A client's plans: what the trainer sent them (whether it reached the app, and what they changed once they accepted it), and the
+// plans in their app. Sending a plan is the one thing a trainer writes for a client; it lands in users/{uid}/assigned and the app
+// offers it. An accepted plan becomes one of the client's own plans, and what they change on a day is kept in it, set by set.
 import { Send, Undo2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useAdmin } from '@/components/AuthProvider';
@@ -10,11 +11,11 @@ import { Empty, ErrorBox, PageSkeleton, ToneBadge } from '@/components/ui';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { dayLabel, describeAssigned } from '@/lib/assign';
-import { listAssignments, listLibrary, listUserRows, sendAssignment, withdrawAssignment } from '@/lib/data';
+import { changesToSentPlan, dayLabel, describeAssigned, describePlanExercise } from '@/lib/assign';
+import { listAssignments, listLibrary, listPlanLibrary, listUserRows, sendAssignment, withdrawAssignment } from '@/lib/data';
 import { useLoad } from '@/lib/hooks';
 import { relativeTime } from '@/lib/logic';
-import type { Assignment, AssignmentFields, ExerciseRow, LibraryExercise, PlanRow } from '@/lib/types';
+import type { Assignment, AssignmentFields, ExerciseRow, LibraryExercise, LibraryPlan, PlanRow } from '@/lib/types';
 import { AssignPlanForm, type ClientPlan } from './AssignPlanForm';
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Prebuilt'];
@@ -55,13 +56,16 @@ export function ClientPlansTab({ uid }: { uid: string }) {
   const loadSent = useCallback(() => listAssignments(uid), [uid]);
   const plans = useLoad(loadPlans);
   const sent = useLoad(loadSent);
-  const [library, setLibrary] = useState<LibraryExercise[] | null>(null);
+  const [library, setLibrary] = useState<{ exercises: LibraryExercise[]; plans: LibraryPlan[] } | null>(null);
   const [open, setOpen] = useState(false);
 
   async function openForm() {
     setOpen(true);
-    // The library is only needed for the form; a library that cannot be read just leaves its picker out.
-    if (library === null) setLibrary(await listLibrary().catch(() => []));
+    // The libraries are only needed for the form; one that cannot be read just leaves its picker out.
+    if (library === null) {
+      const [exercises, plans] = await Promise.all([listLibrary().catch(() => []), listPlanLibrary().catch(() => [])]);
+      setLibrary({ exercises, plans });
+    }
   }
 
   async function send(value: AssignmentFields): Promise<string | undefined> {
@@ -101,7 +105,7 @@ export function ClientPlansTab({ uid }: { uid: string }) {
           </CardAction>
         </CardHeader>
         <CardContent>
-          <SentList sent={sent.data} error={sent.error} onWithdraw={(a) => void withdraw(a)} />
+          <SentList sent={sent.data} error={sent.error} plans={plans.data ?? []} onWithdraw={(a) => void withdraw(a)} />
         </CardContent>
       </Card>
 
@@ -113,7 +117,7 @@ export function ClientPlansTab({ uid }: { uid: string }) {
       {open ? (
         <Modal title="Send a plan" onClose={() => setOpen(false)}>
           {library === null ? <PageSkeleton /> : (
-            <AssignPlanForm library={library} clientPlans={plans.data ?? []} initialName={rememberedName(admin.email)} onSend={send} onCancel={() => setOpen(false)} />
+            <AssignPlanForm library={library.exercises} planLibrary={library.plans} clientPlans={plans.data ?? []} initialName={rememberedName(admin.email)} onSend={send} onCancel={() => setOpen(false)} />
           )}
         </Modal>
       ) : null}
@@ -121,7 +125,14 @@ export function ClientPlansTab({ uid }: { uid: string }) {
   );
 }
 
-function SentList({ sent, error, onWithdraw }: { sent: Assignment[] | undefined; error: unknown; onWithdraw: (assignment: Assignment) => void }) {
+/** What the client changed in an accepted plan, from their copy of it in their app (the plan whose origin is this assignment). */
+function changesOf(assignment: Assignment, plans: ClientPlan[]): string[] | null {
+  if (assignment.status !== 'accepted') return null;
+  const own = plans.find(({ plan }) => plan.planDay === 'Prebuilt' && plan.origin === `trainer:${assignment.id}`);
+  return own ? changesToSentPlan(assignment.exercises ?? [], own.exercises) : null;
+}
+
+function SentList({ sent, error, plans, onWithdraw }: { sent: Assignment[] | undefined; error: unknown; plans: ClientPlan[]; onWithdraw: (assignment: Assignment) => void }) {
   if (error) {
     return (
       <Alert>
@@ -148,6 +159,7 @@ function SentList({ sent, error, onWithdraw }: { sent: Assignment[] | undefined;
               <p className="text-sm">{assignment.exercises.map((e) => `${e.name} ${describeAssigned(e)}`).join(' · ')}</p>
             ) : null}
             {assignment.note ? <p className="text-sm text-muted-foreground">{`Note: ${assignment.note}`}</p> : null}
+            <Changes changes={changesOf(assignment, plans)} />
           </div>
           {assignment.status === 'sent' || assignment.status === 'delivered' ? (
             <Button variant="outline" size="sm" onClick={() => onWithdraw(assignment)}><Undo2 /> Withdraw</Button>
@@ -155,6 +167,18 @@ function SentList({ sent, error, onWithdraw }: { sent: Assignment[] | undefined;
         </li>
       ))}
     </ul>
+  );
+}
+
+/** What the client changed in a plan after accepting it: nothing, or a line for each exercise they changed. Null when their copy cannot be found yet. */
+function Changes({ changes }: { changes: string[] | null }) {
+  if (changes === null) return null;
+  if (!changes.length) return <p className="text-sm text-muted-foreground">Their copy is as you sent it.</p>;
+  return (
+    <div className="mt-1 text-sm">
+      <strong>They changed:</strong>
+      <ul className="list-disc pl-5">{changes.map((change) => <li key={change}>{change}</li>)}</ul>
+    </div>
   );
 }
 
@@ -168,6 +192,14 @@ function StatusBadge({ assignment }: { assignment: Assignment }) {
   }
 }
 
+/** Where one of the client's plans came from, in words: a plan from the plan library, one sent from here, one they made, or the day it was put on. */
+function whereFrom(plan: PlanRow): string {
+  if (plan.planDay !== 'Prebuilt') return plan.sourcePlanId != null ? 'Kept in their plan' : '';
+  if (plan.origin?.startsWith('trainer:')) return 'Sent by a trainer';
+  if (plan.origin?.startsWith('library:')) return 'From the plan library';
+  return 'Made by them';
+}
+
 function PlanCards({ plans }: { plans: ClientPlan[] }) {
   if (!plans.length) return <Empty>No plans in their app yet.</Empty>;
   return (
@@ -176,9 +208,9 @@ function PlanCards({ plans }: { plans: ClientPlan[] }) {
         <Card key={plan.id}>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-              {plan.planName} <ToneBadge tone="info">{plan.planDay === 'Prebuilt' ? 'Library' : plan.planDay ?? ''}</ToneBadge>
+              {plan.planName} <ToneBadge tone="info">{plan.planDay === 'Prebuilt' ? 'Their plan' : plan.planDay ?? ''}</ToneBadge>
             </CardTitle>
-            <CardDescription>{`${exercises.length} ${exercises.length === 1 ? 'exercise' : 'exercises'}`}</CardDescription>
+            <CardDescription>{[`${exercises.length} ${exercises.length === 1 ? 'exercise' : 'exercises'}`, whereFrom(plan)].filter(Boolean).join(' · ')}</CardDescription>
           </CardHeader>
           <CardContent>
             {exercises.length ? (
@@ -186,9 +218,7 @@ function PlanCards({ plans }: { plans: ClientPlan[] }) {
                 {exercises.map((exercise) => (
                   <li key={exercise.id} className="py-1.5">
                     <strong>{exercise.name}</strong>
-                    <span className="text-muted-foreground">
-                      {` ${exercise.sets} × ${exercise.reps}${Number(exercise.dropSets) > 0 ? ` + ${exercise.dropSets} drop` : ''}${Number(exercise.weight) > 0 ? ` @ ${exercise.weight} kg` : ', bodyweight'}`}
-                    </span>
+                    <span className="text-muted-foreground">{` ${describePlanExercise(exercise)}`}</span>
                     {exercise.notes ? <div className="text-muted-foreground">{exercise.notes}</div> : null}
                   </li>
                 ))}

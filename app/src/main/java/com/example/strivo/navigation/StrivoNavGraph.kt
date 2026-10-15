@@ -117,6 +117,7 @@ internal fun StrivoNavGraph(
             ProfileScreen(
                 authViewModel = authViewModel,
                 profileViewModel = profileViewModel,
+                onOpenBody = { navController.navigate(Routes.BODY) },
             )
         }
 
@@ -222,7 +223,6 @@ internal fun StrivoNavGraph(
                     exerciseViewModel = exerciseViewModel,
                     onBack = { navController.popBackStack() },
                     onAddExercise = { navController.navigate(Routes.saveExercise(plan.planId)) },
-                    onOpenLibrary = { navController.navigate(Routes.library(plan.planId)) },
                     onEditExercise = { exercise ->
                         navController.navigate(Routes.saveExercise(plan.planId, exercise.id))
                     },

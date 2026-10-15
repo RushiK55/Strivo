@@ -123,7 +123,7 @@ class ExerciseProgressTest {
     @Test
     fun adherenceCountsScheduledDaysSinceTheFirstWorkout() {
         val sessions = listOf(session(14), session(7), session(2), session(0)) // Mondays and a Saturday
-        val report = buildConsistency(sessions, setOf(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), AnalyticsRange.Month, today)
+        val report = buildConsistency(sessions, mapOf(DayOfWeek.MONDAY to 1, DayOfWeek.WEDNESDAY to 1), AnalyticsRange.Month, today)
 
         // Scheduled Mon/Wed from 14 days ago: Mon(14) Wed(12) Mon(7) Wed(5) Mon(0) -> 3 of 5 done.
         val adherence = report.adherence!!
@@ -135,8 +135,15 @@ class ExerciseProgressTest {
     }
 
     @Test
+    fun aDayWithTwoPlansIsTwoWorkoutsToDo() {
+        // Mondays 14 and 7 days ago and today; two plans on Mondays. Both were done 14 days ago, one 7 days ago, none yet today.
+        val report = buildConsistency(listOf(session(14), session(14), session(7)), mapOf(DayOfWeek.MONDAY to 2), AnalyticsRange.Month, today)
+        assertEquals(Adherence(done = 3, scheduled = 4), report.adherence)
+    }
+
+    @Test
     fun todayIsNotAMissBeforeTheWorkout() {
-        val report = buildConsistency(listOf(session(7)), setOf(DayOfWeek.MONDAY), AnalyticsRange.Month, today)
+        val report = buildConsistency(listOf(session(7)), mapOf(DayOfWeek.MONDAY to 1), AnalyticsRange.Month, today)
         assertEquals(Adherence(done = 1, scheduled = 1), report.adherence)
     }
 

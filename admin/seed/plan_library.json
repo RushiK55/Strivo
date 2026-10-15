@@ -1,0 +1,458 @@
+[
+  {
+    "id": "push-day",
+    "name": "Push Day",
+    "description": "Chest, shoulders and triceps: the pressing muscles, in one session.",
+    "level": "Intermediate",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Bench Press",
+        "sets": 4,
+        "reps": 8,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Overhead Press",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 30,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Incline Dumbbell Press",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 14,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Lateral Raise",
+        "sets": 3,
+        "reps": 15,
+        "weightKg": 6,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Tricep Pushdown",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 20,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Overhead Tricep Extension",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 12,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "pull-day",
+    "name": "Pull Day",
+    "description": "Back and biceps: the pulling muscles, in one session.",
+    "level": "Intermediate",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Pull-Up",
+        "sets": 4,
+        "reps": 8,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Barbell Row",
+        "sets": 4,
+        "reps": 8,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Lat Pulldown",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Seated Cable Row",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 35,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Face Pull",
+        "sets": 3,
+        "reps": 15,
+        "weightKg": 15,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Barbell Curl",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 20,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Hammer Curl",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 10,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "leg-day",
+    "name": "Leg Day",
+    "description": "Quads, hamstrings and calves, with a heavy squat to start.",
+    "level": "Intermediate",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Squat",
+        "sets": 4,
+        "reps": 8,
+        "weightKg": 50,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Romanian Deadlift",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Leg Press",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 80,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Leg Curl",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 25,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Leg Extension",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 30,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Calf Raise",
+        "sets": 4,
+        "reps": 15,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "upper-body",
+    "name": "Upper Body",
+    "description": "A balanced day for the whole upper body: push, pull, shoulders and arms.",
+    "level": "Beginner",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Bench Press",
+        "sets": 3,
+        "reps": 8,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Barbell Row",
+        "sets": 3,
+        "reps": 8,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Overhead Press",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 30,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Lat Pulldown",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Dumbbell Curl",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 10,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Tricep Pushdown",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 20,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "lower-body",
+    "name": "Lower Body",
+    "description": "Legs and glutes: squat, hinge, lunge and calves.",
+    "level": "Beginner",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Squat",
+        "sets": 4,
+        "reps": 8,
+        "weightKg": 50,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Hip Thrust",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Lunge",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 10,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Leg Curl",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 25,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Calf Raise",
+        "sets": 4,
+        "reps": 15,
+        "weightKg": 40,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "full-body-starter",
+    "name": "Full Body Starter",
+    "description": "One simple session that trains everything. A good start for someone new, three times a week.",
+    "level": "Beginner",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Goblet Squat",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 14,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Dumbbell Bench Press",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 16,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "One-Arm Dumbbell Row",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 18,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Dumbbell Shoulder Press",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 12,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Plank",
+        "sets": 3,
+        "reps": 1,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "shoulders-arms",
+    "name": "Shoulders and Arms",
+    "description": "Round shoulders and bigger arms: presses, raises, curls and extensions.",
+    "level": "Intermediate",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Dumbbell Shoulder Press",
+        "sets": 4,
+        "reps": 10,
+        "weightKg": 12,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Lateral Raise",
+        "sets": 4,
+        "reps": 15,
+        "weightKg": 6,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Rear Delt Fly",
+        "sets": 3,
+        "reps": 15,
+        "weightKg": 5,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Barbell Curl",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 20,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Hammer Curl",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 10,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Skull Crusher",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 15,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Tricep Pushdown",
+        "sets": 3,
+        "reps": 12,
+        "weightKg": 20,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  },
+  {
+    "id": "core-conditioning",
+    "name": "Core and Conditioning",
+    "description": "Abs, a strong middle and a bit of cardio to finish.",
+    "level": "Beginner",
+    "active": true,
+    "exercises": [
+      {
+        "name": "Plank",
+        "sets": 3,
+        "reps": 1,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Hanging Leg Raise",
+        "sets": 3,
+        "reps": 10,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Cable Crunch",
+        "sets": 3,
+        "reps": 15,
+        "weightKg": 25,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Russian Twist",
+        "sets": 3,
+        "reps": 20,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Mountain Climber",
+        "sets": 3,
+        "reps": 30,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      },
+      {
+        "name": "Jump Rope",
+        "sets": 3,
+        "reps": 50,
+        "weightKg": 0,
+        "dropSets": 0,
+        "notes": ""
+      }
+    ]
+  }
+]

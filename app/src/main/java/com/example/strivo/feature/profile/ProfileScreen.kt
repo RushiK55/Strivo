@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Equalizer
@@ -74,6 +75,7 @@ private enum class ProfileEdit { Gender, Age, Height, Weight, RestDays }
 fun ProfileScreen(
     authViewModel: AuthViewModel,
     profileViewModel: ProfileViewModel,
+    onOpenBody: () -> Unit = {},
 ) {
     val auth by authViewModel.state.collectAsStateWithLifecycle()
     val state by profileViewModel.state.collectAsStateWithLifecycle()
@@ -134,6 +136,16 @@ fun ProfileScreen(
                 WeightStat("Highest", profile.highWeight, Modifier.weight(1f))
                 StatSeparator()
                 WeightStat("Lowest", profile.lowWeight, Modifier.weight(1f))
+            }
+
+            SectionHeader("Your body")
+            AppCard(padding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)) {
+                SettingsRow(
+                    Icons.Rounded.Accessibility,
+                    "3D body",
+                    value = if (profile.gender.equals("female", ignoreCase = true)) "Female" else "Male",
+                    onClick = onOpenBody,
+                )
             }
 
             SectionHeader("Personal records")

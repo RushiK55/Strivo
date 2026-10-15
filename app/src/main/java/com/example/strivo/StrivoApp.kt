@@ -12,6 +12,7 @@ import com.example.strivo.data.remote.AuthService
 import com.example.strivo.data.repository.StrivoRepository
 import com.example.strivo.data.sync.SyncManager
 import com.example.strivo.domain.model.LibraryExercise
+import com.example.strivo.domain.plan.LibraryPlan
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -86,13 +87,21 @@ class StrivoApp : Application() {
         val db = StrivoDatabase(this, uid)
         val repository = StrivoRepository(db, prefs)
         // The exercise library works from the first launch, offline; the cloud's library replaces this one when it arrives.
-        appScope.launch { repository.seedLibraryIfEmpty(starterLibrary()) }
+        appScope.launch {
+            repository.seedLibraryIfEmpty(starterLibrary())
+            repository.seedPlanLibraryIfEmpty(starterPlans())
+        }
         UserScope(
             prefs = prefs,
             repository = repository,
             sync = SyncManager(this, uid, db, prefs, onCloudDataApplied = { _cloudDataVersion.update { it + 1 } }),
         )
     }
+
+    /** The plans that ship with the app (assets/plan_library.json, the same file the admin dashboard can import). */
+    private fun starterPlans(): List<LibraryPlan> =
+        runCatching { assets.open("plan_library.json").bufferedReader().use { LibraryPlan.listFromJson(it.readText()) } }
+            .getOrDefault(emptyList())
 
     /** The exercises that ship with the app (assets/library.json, the same file the admin dashboard can import). */
     private fun starterLibrary(): List<LibraryExercise> =

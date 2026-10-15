@@ -13,6 +13,9 @@ rules_version = '2';
 //                          then "accepted" (the plan goes onto the day the trainer chose) or "declined"; an answer is final.
 //                          Nobody else writes here, the client included, so what the trainer sees is what was sent.
 //   library/{exerciseId}   the exercise library: every signed-in user reads it, only admins change it
+//   planLibrary/{planId}   the plan library (plans built from the exercise library, which users put on a day): every signed-in user
+//                          reads it, only admins change it. A user who takes a plan gets their own copy under users/{uid}/plans, so
+//                          nothing they change ever reaches this one.
 //   muscles/{muscleId}     what an admin wrote about a muscle of the 3D body (a friendlier name, a description of their own):
 //                          every signed-in user reads it, only admins change it
 //   admins/{uid}           who is an admin; only an admin changes it. The first admin is created by hand in the
@@ -48,6 +51,19 @@ service cloud.firestore {
         // the muscles an exercise trains (ids from the muscle catalogue), optional; the dashboard checks the ids themselves
         && d.get('primaryMuscles', []) is list && d.get('primaryMuscles', []).size() <= 8
         && d.get('secondaryMuscles', []) is list && d.get('secondaryMuscles', []).size() <= 8;
+    }
+
+    // Shape of a plan in the plan library, so one bad write cannot break every phone that reads it. The app also clamps every value.
+    function validLibraryPlan() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['name', 'description', 'level', 'active', 'exercises', 'createdAt', 'updatedAt', 'updatedBy'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.description is string && d.description.size() <= 500
+        && d.level is string && d.level.size() <= 40
+        && d.active is bool
+        && d.exercises is list && d.exercises.size() > 0 && d.exercises.size() <= 30
+        && d.updatedAt is int
+        && d.updatedBy == request.auth.uid;
     }
 
     // Shape of a plan a trainer sends. The app also clamps every value, so this only keeps out what is plainly wrong.
@@ -128,6 +144,12 @@ service cloud.firestore {
     match /library/{exerciseId} {
       allow read: if signedIn();
       allow create, update: if isAdmin() && validLibraryExercise();
+      allow delete: if isAdmin();
+    }
+
+    match /planLibrary/{planId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && planId.matches('^[a-z0-9]+(-[a-z0-9]+)*$') && planId.size() <= 60 && validLibraryPlan();
       allow delete: if isAdmin();
     }
 

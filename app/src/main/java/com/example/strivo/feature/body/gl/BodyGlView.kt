@@ -56,7 +56,7 @@ class BodyGlView(
 
     fun setModel(model: GlbModel, body: BodyKey) = run { queueEvent { renderer.setModel(model, body) }; requestRender() }
 
-    fun setScene(state: DrawState, skin: Boolean) = run { queueEvent { renderer.setScene(state, skin) }; requestRender() }
+    fun setScene(state: DrawState, skin: Boolean, skeleton: Boolean = false) = run { queueEvent { renderer.setScene(state, skin, skeleton) }; requestRender() }
 
     /** Flies to a muscle, or (null) back to the whole body. */
     fun focus(group: String?) = run { queueEvent { renderer.focus(group) }; requestRender() }

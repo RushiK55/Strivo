@@ -10,6 +10,7 @@ Gym workout planner and tracker â€” native Android, built with **Kotlin** a
 - A coach that suggests the next weight (and a lighter week, protein, weigh-ins) from your own logs
 - Food and calorie log, body profile, cloud backup and restore
 - An exercise library (74 starter exercises, managed by an admin) that users browse and add to their plans
+- A plan library (8 starter plans, built from the exercise library and managed by an admin): a user puts a plan on a day, it becomes their own plan, and what they change on the day (heavier weights, fewer reps on the last set, an exercise more or less) is kept in it. It works with no trainer at all
 - A coach dashboard for the gym owner or trainer: attendance, who needs a nudge, each client's strength and body-weight progress and daily calories and protein (never what they eat), plus the exercise library; the trainer can send a client a plan, which the app adds on its next sync (see [admin/README.md](admin/README.md))
 
 ## Stack
@@ -79,7 +80,8 @@ config, creating the first admin and deploying the site; the steps are in [admin
 
 The phone app records what a user does (a plain-language activity log) and a short summary of who they are, both backed
 up under `users/{uid}`. The library lives in `library/{exerciseId}`; every phone keeps a copy and starts with the 74
-exercises from `admin/seed/library.json`, which are bundled into the app.
+exercises from `admin/seed/library.json`, which are bundled into the app. The plan library lives in `planLibrary/{planId}` in the
+same way and starts with the 8 plans from `admin/seed/plan_library.json`.
 
 ## Firebase config (not in git)
 

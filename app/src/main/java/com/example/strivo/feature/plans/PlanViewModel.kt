@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.strivo.StrivoApp
 import com.example.strivo.domain.model.Plan
+import com.example.strivo.domain.plan.LibraryPlan
 import com.example.strivo.domain.plan.PlanOffer
 import com.example.strivo.domain.plan.acceptedNotice
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,14 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _plans = MutableStateFlow<List<Plan>>(emptyList())
     val plans: StateFlow<List<Plan>> = _plans
+
+    /** The plan library: plans an admin published (or the starter ones), to put on a day. */
+    private val _libraryPlans = MutableStateFlow<List<LibraryPlan>>(emptyList())
+    val libraryPlans: StateFlow<List<LibraryPlan>> = _libraryPlans
+
+    /** How many exercises each plan has, by plan id, for the lists of plans. */
+    private val _exerciseCounts = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val exerciseCounts: StateFlow<Map<Long, Int>> = _exerciseCounts
 
     /** What the trainer is offering that the user has not answered, for the card on Home (a week's plans are one offer). */
     private val _offers = MutableStateFlow<List<PlanOffer>>(emptyList())
@@ -29,6 +38,8 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _plans.value = repository.readAllPlans()
             _offers.value = repository.planOffers()
+            _libraryPlans.value = repository.readLibraryPlans()
+            _exerciseCounts.value = repository.readAllExercises().groupingBy { it.planId }.eachCount()
         }
     }
 
@@ -59,10 +70,17 @@ class PlanViewModel(application: Application) : AndroidViewModel(application) {
         return id
     }
 
-    /** Copies a prebuilt plan, with its exercises, onto [day]. */
+    /** Puts one of the user's own plans, with its exercises, on [day]; what is changed there is kept in the plan. */
     suspend fun addPlanToDay(plan: Plan, day: String) {
         repository.copyPlanToDay(plan, day)
         _plans.value = repository.readAllPlans()
+    }
+
+    /** Takes a plan of the plan library into the user's own plans (once) and puts it on [day]. */
+    suspend fun addLibraryPlanToDay(plan: LibraryPlan, day: String) {
+        repository.addLibraryPlanToDay(plan, day)
+        _plans.value = repository.readAllPlans()
+        _exerciseCounts.value = repository.readAllExercises().groupingBy { it.planId }.eachCount()
     }
 
     /** The id of [day]'s plan for extra exercises, created if this is the first one. */
