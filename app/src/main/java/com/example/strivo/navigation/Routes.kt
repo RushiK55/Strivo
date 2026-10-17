@@ -12,7 +12,7 @@ internal object Routes {
     const val SAVE_PLAN = "savePlan"
     const val PICK_PLAN = "pickPlan/{day}"
     const val DAY_PLANS = "dayPlans/{day}"
-    const val PLAN_DETAILS = "planDetails/{planId}"
+    const val PLAN_DETAILS = "planDetails/{planId}?viewOnly={viewOnly}"
     const val SAVE_EXERCISE = "saveExercise/{planId}?exerciseId={exerciseId}&isExtra={isExtra}"
     const val EXERCISE_DETAILS = "exerciseDetails/{planId}/{exerciseId}"
     const val WORKOUT = "workout/{planId}"
@@ -22,7 +22,8 @@ internal object Routes {
     fun historyDetails(sessionId: Long) = "historyDetails/$sessionId"
     fun pickPlan(day: String) = "pickPlan/$day"
     fun dayPlans(day: String) = "dayPlans/$day"
-    fun planDetails(planId: Long) = "planDetails/$planId"
+    /** [viewOnly]: the plan is only looked at (a day that has passed), so there is no button to start it. */
+    fun planDetails(planId: Long, viewOnly: Boolean = false) = "planDetails/$planId?viewOnly=$viewOnly"
     fun saveExercise(planId: Long, exerciseId: Long? = null, isExtra: Boolean = false) =
         "saveExercise/$planId?exerciseId=${exerciseId ?: -1L}&isExtra=$isExtra"
 

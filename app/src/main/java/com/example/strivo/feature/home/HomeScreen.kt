@@ -83,6 +83,10 @@ fun HomeScreen(
     profileViewModel: ProfileViewModel,
     onAddPlan: (day: String) -> Unit,
     onOpenPlan: (Plan) -> Unit,
+    /** Opens a workout that was done (every set of it), for an earlier day. */
+    onOpenSession: (com.example.strivo.domain.model.WorkoutSession) -> Unit = {},
+    /** Opens a plan to look at, with no way to start it (a day that has passed). */
+    onViewPlan: (Plan) -> Unit = {},
     onStartWorkout: (Plan) -> Unit,
     onAddExercise: (planId: Long) -> Unit,
     onOpenLibrary: () -> Unit = {},
@@ -118,6 +122,8 @@ fun HomeScreen(
     val profileState by profileViewModel.state.collectAsStateWithLifecycle()
     val dayExercises by exerciseViewModel.todayExercises.collectAsStateWithLifecycle()
     val selectedDate = remember(selectedDay) { currentWeek.first { dayName(it.dayOfWeek) == selectedDay } }
+    // A day that has passed is looked at, not started: it shows what was done.
+    val isPast = selectedDate.isBefore(today)
     fun exerciseCount(plan: Plan): Int = dayExercises.count { it.planId == plan.planId }
     val finishedToday by exerciseViewModel.finishedToday.collectAsStateWithLifecycle()
     // The ticks come from the exercises loaded for the selected day, so they only apply to that day.
@@ -282,6 +288,15 @@ fun HomeScreen(
 
             item {
                 AppCard(padding = PaddingValues(0.dp)) {
+                    if (isPast) {
+                        PastDayRows(
+                            weekday = selectedDay,
+                            sessions = sessions.filter { it.date.toLocalDate() == selectedDate },
+                            plans = plansForDay.filter { it.planName != EXTRA_PLAN_NAME },
+                            onOpenSession = onOpenSession,
+                            onOpenPlan = onViewPlan,
+                        )
+                    } else {
                     if (plansForDay.isEmpty()) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp),
@@ -337,6 +352,7 @@ fun HomeScreen(
                             Text("Add extra exercise", style = AppType.BodyStrong, color = AppColors.TextPrimary)
                             Text("Something that's not in a plan", style = AppType.Caption, color = AppColors.TextSecondary)
                         }
+                    }
                     }
                 }
             }

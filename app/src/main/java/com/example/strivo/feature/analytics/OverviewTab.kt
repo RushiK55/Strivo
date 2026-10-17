@@ -35,6 +35,7 @@ import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppShapes
 import com.example.strivo.core.ui.theme.AppType
 import com.example.strivo.core.util.formatKg
+import com.example.strivo.core.util.formatMinutes
 import com.example.strivo.domain.analytics.AnalyticsRange
 import com.example.strivo.domain.analytics.AnalyticsReport
 import com.example.strivo.domain.analytics.DayStat

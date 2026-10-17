@@ -7,3 +7,9 @@ fun formatWeight(kg: Double): String = if (kg % 1.0 == 0.0) kg.toInt().toString(
 
 /** 12345.6 -> "12,346 kg": a total, to the whole kilo. */
 fun formatKg(kg: Double): String = "%,.0f kg".format(Locale.getDefault(), kg)
+
+/** 52 min, 1h 05m. */
+fun formatMinutes(seconds: Double): String {
+    val minutes = (seconds / 60).toInt()
+    return if (minutes < 60) "$minutes min" else "%dh %02dm".format(minutes / 60, minutes % 60)
+}

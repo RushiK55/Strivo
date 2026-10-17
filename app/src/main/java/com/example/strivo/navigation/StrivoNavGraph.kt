@@ -98,6 +98,11 @@ internal fun StrivoNavGraph(
                 profileViewModel = profileViewModel,
                 onAddPlan = { day -> navController.navigate(Routes.pickPlan(day)) },
                 onOpenPlan = { plan -> plan.planId?.let { navController.navigate(Routes.planDetails(it)) } },
+                onViewPlan = { plan -> plan.planId?.let { navController.navigate(Routes.planDetails(it, viewOnly = true)) } },
+                onOpenSession = { session ->
+                    exerciseViewModel.fetchHistory() // the details screen reads the shared history list
+                    session.id?.let { navController.navigate(Routes.historyDetails(it)) }
+                },
                 onStartWorkout = { plan -> plan.planId?.let { navController.navigate(Routes.workout(it)) } },
                 onAddExercise = { planId -> navController.navigate(Routes.saveExercise(planId)) },
                 onOpenLibrary = { navController.navigate(Routes.library()) },
@@ -213,12 +218,16 @@ internal fun StrivoNavGraph(
 
         composable(
             Routes.PLAN_DETAILS,
-            arguments = listOf(navArgument("planId") { type = NavType.LongType }),
+            arguments = listOf(
+                navArgument("planId") { type = NavType.LongType },
+                navArgument("viewOnly") { type = NavType.BoolType; defaultValue = false },
+            ),
         ) { entry ->
             val plan = planById(entry.arguments?.getLong("planId"))
             if (plan?.planId != null) {
                 PlanDetailsScreen(
                     plan = plan,
+                    canStart = entry.arguments?.getBoolean("viewOnly") != true,
                     otherPlans = plans.filter { it.planId != plan.planId },
                     exerciseViewModel = exerciseViewModel,
                     onBack = { navController.popBackStack() },

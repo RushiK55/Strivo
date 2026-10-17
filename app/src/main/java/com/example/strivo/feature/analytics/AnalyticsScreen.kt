@@ -36,6 +36,7 @@ import com.example.strivo.core.ui.components.ScreenTopBar
 import com.example.strivo.core.ui.components.SegmentedControl
 import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppType
+import com.example.strivo.core.util.formatMinutes
 import com.example.strivo.core.util.formatKg
 import com.example.strivo.domain.analytics.AnalyticsRange
 import com.example.strivo.domain.analytics.DayStat
@@ -205,12 +206,6 @@ private fun EmptyAnalytics(range: AnalyticsRange) {
 // --- Pieces ---
 
 // --- Formatting ---
-
-/** 52 min, 1h 05m. */
-internal fun formatMinutes(seconds: Double): String {
-    val minutes = (seconds / 60).toInt()
-    return if (minutes < 60) "$minutes min" else "%dh %02dm".format(minutes / 60, minutes % 60)
-}
 
 /** 1:35 for 95 seconds. */
 internal fun formatSeconds(seconds: Long): String = "%d:%02d".format(seconds / 60, seconds % 60)

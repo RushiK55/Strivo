@@ -99,6 +99,8 @@ fun PlanDetailsScreen(
     onEditExercise: (Exercise) -> Unit,
     onOpenExercise: (Exercise) -> Unit,
     onStartWorkout: () -> Unit,
+    /** False when the plan is only being looked at (a day that has passed): no button to start it. */
+    canStart: Boolean = true,
 ) {
     val scope = rememberCoroutineScope()
     val exercises by exerciseViewModel.exercises.collectAsStateWithLifecycle()
@@ -179,7 +181,7 @@ fun PlanDetailsScreen(
         backButtonBackground = AppColors.Surface,
         header = {},
         overlay = {
-            if (exercises.isNotEmpty() && !plan.isPrebuilt) {
+            if (exercises.isNotEmpty() && !plan.isPrebuilt && canStart) {
                 StartWorkoutButton(
                     onClick = onStartWorkout,
                     modifier = Modifier.align(Alignment.BottomCenter),
