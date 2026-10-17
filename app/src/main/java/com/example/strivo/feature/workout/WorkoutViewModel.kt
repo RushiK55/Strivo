@@ -11,6 +11,7 @@ import com.example.strivo.domain.coach.Advice
 import com.example.strivo.domain.coach.exerciseKey
 import com.example.strivo.domain.coach.progressionAdvice
 import com.example.strivo.domain.model.Exercise
+import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.model.ExerciseSet
 import com.example.strivo.domain.model.PerformedExercise
 import com.example.strivo.domain.model.Plan
@@ -67,6 +68,10 @@ class WorkoutViewModel(
     private val _setTime = MutableStateFlow("00:00")
     val setTime: StateFlow<String> = _setTime
 
+    /** The exercise library, for the words about an exercise (how to do it, the tip, the muscles). */
+    private val _library = MutableStateFlow<List<LibraryExercise>>(emptyList())
+    val library: StateFlow<List<LibraryExercise>> = _library
+
     private val eventChannel = Channel<WorkoutEvent>(Channel.BUFFERED)
     val events: Flow<WorkoutEvent> = eventChannel.receiveAsFlow()
 
@@ -87,6 +92,7 @@ class WorkoutViewModel(
     }
 
     private fun load() {
+        viewModelScope.launch { _library.value = repository.readLibrary() }
         viewModelScope.launch {
             // This workout is not saved yet, so the advice comes from earlier ones only.
             _advice.value = exerciseHistories(repository.getWorkoutSessions())

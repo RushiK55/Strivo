@@ -74,10 +74,14 @@ internal fun Overview(report: AnalyticsReport) {
                     Text("${"%.0f".format(Locale.getDefault(), kotlin.math.abs(change))}%", style = AppType.Caption.copy(fontWeight = FontWeight.SemiBold), color = color)
                 }
                 Spacer(Modifier.width(8.dp))
-                Text("vs the previous ${report.range.label}", style = AppType.Caption, color = AppColors.TextSecondary)
+                Text("vs ${report.range.previous}", style = AppType.Caption, color = AppColors.TextSecondary)
             }
         } else {
-            Text("Trained ${report.activeDays} of ${report.range.days} days", style = AppType.Caption, color = AppColors.TextSecondary)
+            Text(
+                if (report.range == AnalyticsRange.Today) (if (report.activeDays > 0) "Trained today" else "Nothing trained yet today") else "Trained ${report.activeDays} of ${report.range.days} days",
+                style = AppType.Caption,
+                color = AppColors.TextSecondary,
+            )
         }
     }
 }
@@ -87,7 +91,7 @@ internal fun Overview(report: AnalyticsReport) {
 internal fun StatGrid(report: AnalyticsReport) {
     val tiles = listOf(
         "Workouts" to report.workouts.toString(),
-        "Active days" to "${report.activeDays} / ${report.range.days}",
+        "Active days" to ("${report.activeDays} / ${report.range.days}".takeIf { report.range != AnalyticsRange.Today } ?: if (report.activeDays > 0) "Yes" else "Not yet"),
         "Current streak" to if (report.streak == 1) "1 day" else "${report.streak} days",
         "Time trained" to formatMinutes(report.totalSeconds.toDouble()),
         "Total sets" to report.sets.toString(),
@@ -201,7 +205,7 @@ internal fun RatioRow(title: String, value: String, subtitle: String?, fraction:
 @Composable
 internal fun Timeline(report: AnalyticsReport, onOpenSession: (WorkoutSession) -> Unit) {
     // A week shows every day, rest days included; a month only the days that were trained.
-    val rows = report.days.asReversed().let { days -> if (report.range == AnalyticsRange.Week) days else days.filter { !it.isRestDay } }
+    val rows = report.days.asReversed().let { days -> if (report.range == AnalyticsRange.Week || report.range == AnalyticsRange.Today) days else days.filter { !it.isRestDay } }
     Column {
         AccentTitle("What you did")
         Spacer(Modifier.height(12.dp))
@@ -241,7 +245,12 @@ private fun TimelineRow(day: DayStat, onOpenSession: (WorkoutSession) -> Unit) {
         }
         Spacer(Modifier.width(16.dp))
         if (day.isRestDay) {
-            Text("Rest day", style = AppType.Body, color = AppColors.TextTertiary, modifier = Modifier.padding(top = 12.dp))
+            Text(
+                if (day.date == java.time.LocalDate.now()) "Nothing yet today" else "Rest day",
+                style = AppType.Body,
+                color = AppColors.TextTertiary,
+                modifier = Modifier.padding(top = 12.dp),
+            )
         } else if (day.sessions.size > 1) {
             Column(Modifier.weight(1f), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
                 day.sessions.forEach { session ->

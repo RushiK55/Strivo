@@ -148,6 +148,8 @@ fun ProfileScreen(
                 )
             }
 
+            NotificationsSection()
+
             SectionHeader("Personal records")
             AppCard(padding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)) {
                 SettingsRow(Icons.Rounded.FitnessCenter, "Heaviest lift", value = "${records.maxWeight.fixed1()} kg")
@@ -363,7 +365,7 @@ private fun ProfileHeader(name: String, email: String) {
 }
 
 @Composable
-private fun SectionHeader(title: String) {
+internal fun SectionHeader(title: String) {
     Text(
         title,
         style = AppType.BodyStrong,
@@ -398,7 +400,7 @@ private fun StatSeparator() {
 }
 
 @Composable
-private fun RowDivider() {
+internal fun RowDivider() {
     HorizontalDivider(Modifier.padding(start = 62.dp), thickness = 1.dp, color = AppColors.Divider)
 }
 
@@ -407,7 +409,7 @@ private fun RowDivider() {
  * Destructive rows pass a red [tint] for both the icon and the label.
  */
 @Composable
-private fun SettingsRow(
+internal fun SettingsRow(
     icon: ImageVector,
     label: String,
     value: String? = null,

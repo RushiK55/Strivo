@@ -134,6 +134,16 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
   `admin/seed/plan_library.json`). The Library screen (the book icon on Home) has an Exercises and a Plans side, so the plan library is browsed where the exercise library is, and a plan is put on a day from there. The Add plan screen lists the user's own plans first (made by them, accepted from a trainer, or taken from
   the library) and the plan library under them; it works with no trainer at all. The old copy-and-paste sharing of plans is gone: the libraries
   replace it.
+- **Notifications.** `core/notify`: `Notifier` shows a plan from the trainer (one notification for a week's worth) and the daily workout reminder, each
+  on its own channel; nothing is shown without the user's permission (asked once on Home, with the reasons first, and switchable in Profile →
+  Notifications, where the reminder time is chosen too). `NotificationWork` (WorkManager, so it survives a restart of the phone) runs an hourly check
+  that syncs and tells about each new plan once (`SyncManager.onNewOffers`, `UserPrefs.notifiedOfferIds`; not while the app is on screen), and a
+  one-time job each day that decides the reminder (`domain/notify/Reminders.kt`, tested): today's workout still to do, a plan from the trainer waiting,
+  or a weigh-in a week old, and nothing when there is nothing to say. Each run sets up the next one.
+- **Closed for today.** A card the user closes (a message from the trainer, a coach tip) is hidden for the rest of the day and comes back the next
+  one if it is still true (`UserPrefs.snoozeToday`: keys kept with their date, so a new day starts with none).
+- **During a workout** every exercise has an (i) button, in the list and in the full-screen set view, that opens everything about it: the plan, its
+  notes, how it is done, the tip, the muscles and a video (`ExerciseInfoSheet`; the words come from the exercise library, found by name).
 - **Plans on a day.** Putting a plan on a day (`StrivoRepository.copyPlanToDay`, `addLibraryPlanToDay`) makes a copy that stays linked to the user's
   plan (`plans.sourcePlanId`, `exercises.sourceId`; taking a library plan first makes the user's own plan, once). Everything a day plans (every
   set's weight and reps, the sets, name, notes, an exercise added or taken out) is written to the user's plan at once

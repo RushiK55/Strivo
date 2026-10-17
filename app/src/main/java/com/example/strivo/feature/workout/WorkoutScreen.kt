@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.strivo.domain.coach.exerciseKey
 import com.example.strivo.core.ui.components.ScreenTopBar
 import com.example.strivo.core.ui.components.SoftButton
 import com.example.strivo.core.ui.components.StrivoAlertDialog
@@ -64,6 +65,9 @@ fun WorkoutScreen(
     val snackbarHost = remember { SnackbarHostState() }
 
     var picker by remember { mutableStateOf<Picker?>(null) }
+    // The exercise whose notes and details are open (its index in the workout), or none.
+    var infoFor by remember { mutableStateOf<Int?>(null) }
+    val library by viewModel.library.collectAsStateWithLifecycle()
     var summaryExerciseIndex by remember { mutableStateOf<Int?>(null) }
     var showComplete by remember { mutableStateOf(false) }
     var workoutFinished by remember { mutableStateOf(false) }
@@ -163,6 +167,7 @@ fun WorkoutScreen(
                             viewModel = viewModel,
                             onPickWeight = { setIndex, set -> picker = Picker.Weight(index, setIndex, set.weight) },
                             onPickReps = { setIndex, set -> picker = Picker.Reps(index, setIndex, if (set.reps == 0) 10 else set.reps) },
+                            onInfo = { infoFor = index },
                         )
                         PostExerciseRest(index, exercise, viewModel)
                     }
@@ -184,7 +189,17 @@ fun WorkoutScreen(
         }
     }
 
-    FocusOverlay(visible = focusVisible, info = lastFocus, viewModel = viewModel, onClose = { focusOpen = false })
+    FocusOverlay(visible = focusVisible, info = lastFocus, viewModel = viewModel, onClose = { focusOpen = false }, onInfo = { infoFor = it })
+    }
+
+    infoFor?.let { index ->
+        state.exercises.getOrNull(index)?.let { exercise ->
+            ExerciseInfoSheet(
+                exercise = exercise,
+                details = library.firstOrNull { exerciseKey(it.name) == exerciseKey(exercise.name) },
+                onDismiss = { infoFor = null },
+            )
+        }
     }
 
     if (showFinishEarly) {

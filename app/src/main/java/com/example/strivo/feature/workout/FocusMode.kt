@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -107,7 +108,7 @@ internal fun focusTarget(state: WorkoutState): FocusInfo? {
  * (accent), STOP while a set runs (orange). The list only shows again when the user closes this view.
  */
 @Composable
-internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutViewModel, onClose: () -> Unit) {
+internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: WorkoutViewModel, onClose: () -> Unit, onInfo: (Int) -> Unit = {}) {
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)), exit = fadeOut(tween(250))) {
         Box(
             Modifier
@@ -189,6 +190,17 @@ internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: Workout
                     .background(AppColors.Surface.copy(alpha = 0.85f)),
             ) {
                 Icon(Icons.Rounded.Close, contentDescription = "Show exercise list", tint = AppColors.TextPrimary)
+            }
+            // How this exercise is done, its notes and tip, without leaving the set.
+            IconButton(
+                onClick = { onInfo(info.exerciseIndex) },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .clip(CircleShape)
+                    .background(AppColors.Surface.copy(alpha = 0.85f)),
+            ) {
+                Icon(androidx.compose.material.icons.Icons.Outlined.Info, contentDescription = "About this exercise: notes and how to do it", tint = AppColors.TextPrimary)
             }
             Column(
                 modifier = Modifier

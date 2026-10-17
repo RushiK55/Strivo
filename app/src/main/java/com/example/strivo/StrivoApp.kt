@@ -1,8 +1,12 @@
 package com.example.strivo
 
+import android.app.Activity
 import android.app.Application
+import android.os.Bundle
 import android.net.ConnectivityManager
 import android.net.Network
+import com.example.strivo.core.notify.NotificationWork
+import com.example.strivo.core.notify.Notifier
 import com.example.strivo.core.ui.components.WheelSound
 import com.example.strivo.data.local.LegacyData
 import com.example.strivo.data.local.db.StrivoDatabase
@@ -13,6 +17,9 @@ import com.example.strivo.data.repository.StrivoRepository
 import com.example.strivo.data.sync.SyncManager
 import com.example.strivo.domain.model.LibraryExercise
 import com.example.strivo.domain.plan.LibraryPlan
+import com.example.strivo.domain.plan.PlanAssignment
+import com.example.strivo.domain.plan.groupOffers
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,8 +48,24 @@ class StrivoApp : Application() {
     private val _cloudDataVersion = MutableStateFlow(0)
     val cloudDataVersion: StateFlow<Int> = _cloudDataVersion
 
+    /** How many of the app's screens are on show: more than none means the user is looking at the app. */
+    @Volatile
+    private var startedActivities = 0
+    val isInForeground: Boolean get() = startedActivities > 0
+
     override fun onCreate() {
         super.onCreate()
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) { startedActivities++ }
+            override fun onActivityStopped(activity: Activity) { startedActivities = maxOf(0, startedActivities - 1) }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
+        Notifier.createChannels(this)
+        NotificationWork.scheduleCheck(this)
         // When the connection comes back, upload what was saved offline and read what changed elsewhere.
         val connectivity = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
@@ -57,7 +80,30 @@ class StrivoApp : Application() {
         if (previous == uid) return
         previous?.let { scopeFor(it).sync.stop() }
         activeUid = uid
-        uid?.let { scopeFor(it).sync.start(appScope) }
+        uid?.let {
+            val scope = scopeFor(it)
+            scope.sync.start(appScope)
+            // The daily reminder goes off at this account's time (or is taken away when the account turned it off).
+            NotificationWork.scheduleReminder(this, scope.prefs.getNotifySettings())
+        } ?: NotificationWork.cancelReminder(this)
+    }
+
+    /**
+     * For background work that starts with no screen open (the hourly check, the daily reminder): makes the account that was signed in
+     * the active one again. False when nobody is signed in.
+     */
+    fun restoreActiveUser(): Boolean {
+        if (activeUid != null) return true
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: session.getSession().uid
+        if (uid.isNullOrBlank()) return false
+        setActiveUser(uid)
+        return true
+    }
+
+    /** Tells the user about plans their trainer just sent, when they are not already looking at the app (and have not turned it off). */
+    private fun notifyNewOffers(uid: String, prefs: UserPrefs, fresh: List<PlanAssignment>) {
+        if (uid != activeUid || isInForeground || !prefs.getNotifySettings().trainerPlans) return
+        Notifier.trainerPlans(this, groupOffers(fresh))
     }
 
     /** Called when the app comes to the foreground. */
@@ -94,7 +140,11 @@ class StrivoApp : Application() {
         UserScope(
             prefs = prefs,
             repository = repository,
-            sync = SyncManager(this, uid, db, prefs, onCloudDataApplied = { _cloudDataVersion.update { it + 1 } }),
+            sync = SyncManager(
+                this, uid, db, prefs,
+                onCloudDataApplied = { _cloudDataVersion.update { it + 1 } },
+                onNewOffers = { fresh -> notifyNewOffers(uid, prefs, fresh) },
+            ),
         )
     }
 

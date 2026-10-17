@@ -85,8 +85,7 @@ internal fun PlanRow(
                 text = when {
                     completed -> "Completed"
                     exercises == 0 -> "No exercises yet"
-                    exercises == 1 -> "1 exercise"
-                    else -> "$exercises exercises"
+                    else -> (if (exercises == 1) "1 exercise" else "$exercises exercises") + if (plan.isOneOff) " · today only" else ""
                 },
                 style = AppType.Caption,
                 color = if (completed) AppColors.Accent else AppColors.TextSecondary,

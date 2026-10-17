@@ -41,27 +41,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.strivo.core.ui.components.AccentButton
 import com.example.strivo.core.ui.components.IconBadge
+import com.example.strivo.core.ui.components.SegmentedControl
 import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppShapes
 import com.example.strivo.core.ui.theme.AppType
 import com.example.strivo.domain.model.Exercise
 
 /**
- * Picks extra exercises for a day from the exercises the user already has (their plans, the prebuilt ones, earlier
- * extras). Tapping a row adds it to the day at once and ticks it; "New exercise" is for something not in the list.
+ * Picks extra exercises for a day: every exercise (the user's own and the whole exercise library), or a whole plan (the user's own and
+ * the plan library's), whose exercises are all added. Tapping a row adds it to the day at once and ticks it; "New exercise" is for
+ * something not in the list.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExtraExerciseSheet(
     day: String,
     exercises: List<Exercise>,
+    plans: List<PlanChoice>,
     addedNames: Set<String>,
+    /** The names of the plans the day already has, so a plan added from here shows as added. */
+    addedPlanNames: Set<String>,
     onAdd: (Exercise) -> Unit,
+    onAddPlan: (PlanChoice) -> Unit,
     onNew: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var showPlans by remember { mutableStateOf(false) }
     val shown = exercises.filter { it.name.contains(query.trim(), ignoreCase = true) }
+    val shownPlans = plans.filter { p -> query.isBlank() || p.name.contains(query.trim(), ignoreCase = true) || p.exercises.any { it.name.contains(query.trim(), ignoreCase = true) } }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -77,14 +85,26 @@ fun ExtraExerciseSheet(
                 .padding(bottom = 20.dp),
         ) {
             Text("Add extra exercise", color = AppColors.TextPrimary, style = AppType.Title)
-            Text("Pick from your exercises to add to $day.", color = AppColors.TextSecondary, fontSize = 13.sp)
-            Spacer(Modifier.height(16.dp))
+            Text(
+                if (showPlans) "Add a whole plan to $day, for that day only." else "Pick from your exercises and the exercise library to add to $day.",
+                color = AppColors.TextSecondary,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(14.dp))
+            SegmentedControl(
+                options = listOf("Exercises", "Plans"),
+                selectedIndex = if (showPlans) 1 else 0,
+                onSelect = { showPlans = it == 1 },
+                trackColor = AppColors.Field,
+                selectedColor = AppColors.SurfaceHigh,
+            )
+            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                placeholder = { Text("Search exercises") },
+                placeholder = { Text(if (showPlans) "Search plans or exercises" else "Search exercises") },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = AppColors.Accent) },
                 shape = AppShapes.Control,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -101,7 +121,23 @@ fun ExtraExerciseSheet(
             )
             Spacer(Modifier.height(12.dp))
 
-            if (shown.isEmpty()) {
+            if (showPlans) {
+                if (shownPlans.isEmpty()) {
+                    Text(
+                        text = if (plans.isEmpty()) "There are no plans to pick from yet." else "No plan matches \"${query.trim()}\".",
+                        color = AppColors.TextSecondary,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(vertical = 24.dp),
+                    )
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 380.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(shownPlans, key = { it.detail + it.name }) { plan ->
+                            val added = plan.name.trim().lowercase() in addedPlanNames
+                            PlanRow(plan, added, onClick = { if (!added) onAddPlan(plan) })
+                        }
+                    }
+                }
+            } else if (shown.isEmpty()) {
                 Text(
                     text = if (exercises.isEmpty()) "You have no exercises yet. Add a new one below." else "No exercise matches \"${query.trim()}\".",
                     color = AppColors.TextSecondary,
@@ -130,6 +166,34 @@ fun ExtraExerciseSheet(
             TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Text("Done", style = AppType.BodyStrong, color = AppColors.TextSecondary)
             }
+        }
+    }
+}
+
+@Composable
+private fun PlanRow(plan: PlanChoice, added: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(AppShapes.Control)
+            .background(AppColors.Field)
+            .clickable(enabled = !added, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(plan.name, color = AppColors.TextPrimary, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(
+                "${plan.detail} · ${plan.exercises.size} ${if (plan.exercises.size == 1) "exercise" else "exercises"}",
+                color = AppColors.TextSecondary,
+                fontSize = 12.sp,
+            )
+            Text(plan.exercises.joinToString(", ") { it.name }, color = AppColors.TextTertiary, fontSize = 12.sp, maxLines = 2)
+        }
+        if (added) {
+            Icon(Icons.Rounded.Check, contentDescription = "Added", tint = AppColors.Accent, modifier = Modifier.size(24.dp))
+        } else {
+            IconBadge(icon = Icons.Rounded.Add, tint = Color.Black, background = AppColors.Accent, padding = 6.dp, iconSize = 18.dp)
         }
     }
 }

@@ -22,10 +22,16 @@ data class Plan(
 
     /** Whether a plan sent by a trainer, or one from the plan library, is where this plan came from. */
     val fromTrainer: Boolean get() = origin.startsWith(TRAINER_ORIGIN)
+
+    /** A plan added for one day only (from "Add extra exercise"): a real plan for that day, which is gone the next morning. */
+    val isOneOff: Boolean get() = origin == ONE_OFF_ORIGIN
     val fromLibrary: Boolean get() = origin.startsWith(LIBRARY_ORIGIN)
 }
 
 const val TRAINER_ORIGIN = "trainer:"
+
+/** The [Plan.origin] of a plan added for one day only. */
+const val ONE_OFF_ORIGIN = "extra"
 const val LIBRARY_ORIGIN = "library:"
 
 /** The plan a day's extra exercises (done on top of, or instead of, the planned ones) are collected in. */

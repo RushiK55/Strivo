@@ -67,6 +67,8 @@ class SyncManager(
     private val db: StrivoDatabase,
     private val prefs: UserPrefs,
     private val onCloudDataApplied: () -> Unit,
+    /** Called with the plans from the trainer that this phone has not told the user about yet. */
+    private val onNewOffers: (List<PlanAssignment>) -> Unit = {},
 ) {
     private val _status = MutableStateFlow(SyncStatus())
     val status: StateFlow<SyncStatus> = _status
@@ -116,6 +118,9 @@ class SyncManager(
         job?.cancel()
         job = null
     }
+
+    /** One full sync now (upload, then read the cloud) for the background check; false when offline or it failed. */
+    suspend fun syncNowAndWait(): Boolean = if (isOnline()) syncOnce(pull = true) else false
 
     /** Asks for a sync as soon as possible; [pull] also reads the cloud. Resets the back-off after failures. */
     fun requestSync(pull: Boolean = false) {
@@ -290,6 +295,12 @@ class SyncManager(
         if (requeued) wake.trySend(false)
         val before = prefs.getOffers().map { it.id }.toSet()
         prefs.setOffers(waiting)
+        val told = prefs.notifiedOfferIds()
+        val fresh = waiting.filter { it.id !in told }
+        if (fresh.isNotEmpty()) {
+            prefs.addNotifiedOffers(fresh.map { it.id })
+            onNewOffers(fresh)
+        }
         waiting.map { it.id }.toSet() != before
     } catch (e: CancellationException) {
         throw e

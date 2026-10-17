@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Check
@@ -83,6 +84,8 @@ internal fun ExerciseItem(
     viewModel: WorkoutViewModel,
     onPickWeight: (Int, ExerciseSet) -> Unit,
     onPickReps: (Int, ExerciseSet) -> Unit,
+    /** Opens everything about this exercise: its notes, how it is done, the tip, the muscles. */
+    onInfo: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val expanded = exerciseIndex in state.expandedExercises
@@ -142,6 +145,14 @@ internal fun ExerciseItem(
                     maxLines = 1,
                 )
             }
+            IconButton(onClick = onInfo, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = "About ${exercise.name}: notes and how to do it",
+                    tint = if (exercise.notes.isNotBlank()) AppColors.Accent else AppColors.TextSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
             Icon(
                 imageVector = Icons.Rounded.ExpandMore,
                 contentDescription = if (expanded) "Collapse" else "Expand",
@@ -156,6 +167,24 @@ internal fun ExerciseItem(
             exit = shrinkVertically(tween(250)) + fadeOut(tween(150)),
         ) {
             Column(Modifier.padding(bottom = 12.dp)) {
+                // What the plan says about this exercise, in view while it is done; a tap opens all of it.
+                if (exercise.notes.isNotBlank()) {
+                    Text(
+                        exercise.notes,
+                        style = AppType.Caption,
+                        color = AppColors.TextPrimary,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(horizontal = 14.dp)
+                            .padding(bottom = 10.dp)
+                            .fillMaxWidth()
+                            .clip(AppShapes.Control)
+                            .background(AppColors.SurfaceHigh)
+                            .clickable(onClick = onInfo)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
+                }
                 // The coach's weight for today, while the sets it applies to are still to do.
                 val advice by viewModel.advice.collectAsStateWithLifecycle()
                 val tip = advice[exerciseKey(exercise.name)]?.takeIf { tip ->

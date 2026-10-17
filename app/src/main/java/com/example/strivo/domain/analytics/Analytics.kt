@@ -6,11 +6,21 @@ import com.example.strivo.domain.model.isWork
 import java.time.DayOfWeek
 import java.time.LocalDate
 
-/** How far back the analytics look. */
+/** How far back the analytics look: just today, or the last 7, 30 or 90 days. */
 enum class AnalyticsRange(val label: String, val days: Int) {
+    Today("Today", 1),
     Week("7 days", 7),
     Month("30 days", 30),
-    Quarter("90 days", 90),
+    Quarter("90 days", 90);
+
+    /** The chip: "Today", "Last 7 days". */
+    val chip: String get() = if (this == Today) "Today" else "Last $label"
+
+    /** After "in" or "for": "today", "the last 7 days". */
+    val phrase: String get() = if (this == Today) "today" else "the last $label"
+
+    /** What the change is measured against: "yesterday", "the previous 7 days". */
+    val previous: String get() = if (this == Today) "yesterday" else "the previous $label"
 }
 
 /** Everything done on one calendar day. A day without workouts has all zeros (a rest day). */

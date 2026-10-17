@@ -3,6 +3,7 @@ package com.example.strivo.data.local.prefs
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.strivo.core.util.todayIso
+import com.example.strivo.domain.notify.NotifySettings
 import com.example.strivo.domain.body.MuscleNote
 import com.example.strivo.domain.body.MuscleNotes
 import com.example.strivo.domain.plan.PlanAssignment
@@ -255,6 +256,47 @@ class UserPrefs(context: Context, uid: String) {
 
     // --- Daily reset ---
 
+    // --- Closed for today ---
+    // A card the user closes (a message from the trainer, a tip from the coach) is hidden for the rest of the day and is back the next
+    // one, if what it said is still true: the keys are kept with their date, and a new day starts with none.
+
+    fun snoozedToday(): Set<String> =
+        if (prefs.getString(KEY_SNOOZE_DATE, null) == todayIso()) prefs.getStringSet(KEY_SNOOZED, emptySet()).orEmpty().toSet() else emptySet()
+
+    fun snoozeToday(key: String) {
+        prefs.edit().putString(KEY_SNOOZE_DATE, todayIso()).putStringSet(KEY_SNOOZED, snoozedToday() + key).apply()
+    }
+
+    // --- Notifications ---
+
+    fun getNotifySettings() = NotifySettings(
+        reminders = prefs.getBoolean(KEY_NOTIFY_REMINDERS, true),
+        hour = prefs.getInt(KEY_NOTIFY_HOUR, 18),
+        minute = prefs.getInt(KEY_NOTIFY_MINUTE, 0),
+        trainerPlans = prefs.getBoolean(KEY_NOTIFY_TRAINER, true),
+    )
+
+    fun setNotifySettings(settings: NotifySettings) {
+        prefs.edit()
+            .putBoolean(KEY_NOTIFY_REMINDERS, settings.reminders)
+            .putInt(KEY_NOTIFY_HOUR, settings.hour)
+            .putInt(KEY_NOTIFY_MINUTE, settings.minute)
+            .putBoolean(KEY_NOTIFY_TRAINER, settings.trainerPlans)
+            .apply()
+    }
+
+    /** Plans from the trainer the phone has already told the user about, so each one is announced once. */
+    fun notifiedOfferIds(): Set<String> = prefs.getStringSet(KEY_NOTIFIED_OFFERS, emptySet()).orEmpty().toSet()
+
+    fun addNotifiedOffers(ids: Collection<String>) {
+        prefs.edit().putStringSet(KEY_NOTIFIED_OFFERS, notifiedOfferIds() + ids).apply()
+    }
+
+    /** Whether the user has been asked to allow notifications (asked once, when they first reach Home). */
+    var askedNotifications: Boolean
+        get() = prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)
+        set(value) { prefs.edit().putBoolean(KEY_ASKED_NOTIFICATIONS, value).apply() }
+
     /** Returns true (once per calendar day) when the daily reset should run. */
     fun consumeDailyReset(): Boolean {
         val today = todayIso()
@@ -295,6 +337,14 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_MUSCLE_NOTES = "muscle_notes"
         private const val KEY_DECLINED_PLANS = "declined_plans"
         private const val KEY_PENDING_ANSWERS = "plan_answers"
+        private const val KEY_SNOOZE_DATE = "snooze_date"
+        private const val KEY_SNOOZED = "snoozed"
+        private const val KEY_NOTIFY_REMINDERS = "notify_reminders"
+        private const val KEY_NOTIFY_HOUR = "notify_hour"
+        private const val KEY_NOTIFY_MINUTE = "notify_minute"
+        private const val KEY_NOTIFY_TRAINER = "notify_trainer"
+        private const val KEY_NOTIFIED_OFFERS = "notified_offers"
+        private const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
         private const val MARKER = -1L // stands for the plan itself in a finished-plans entry
     }
 }

@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
@@ -73,6 +75,8 @@ internal fun AdviceCard(
     onSeeAll: (() -> Unit)? = null,
     acceptLabel: (Advice) -> String? = { null },
     onAccept: (Advice) -> Unit = {},
+    /** Closes a tip for today: it is hidden until tomorrow, and is back then if it is still true. */
+    onDismiss: ((Advice) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val shown = advice.take(limit)
@@ -89,6 +93,7 @@ internal fun AdviceCard(
                         Toast.makeText(context, "${item.exercise} is now ${formatWeight(item.suggestedKg ?: 0.0)} kg in $where", Toast.LENGTH_SHORT).show()
                     }
                 },
+                onDismiss = onDismiss?.let { dismiss -> { dismiss(item) } },
             )
         }
         if (onSeeAll != null) {
@@ -119,8 +124,9 @@ internal fun AdviceRow(
     modifier: Modifier = Modifier,
     acceptedIn: String? = null,
     onAccept: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
 ) {
-    Row(modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+    Row(modifier.padding(start = 14.dp, end = if (onDismiss != null) 6.dp else 14.dp, top = 12.dp, bottom = 12.dp)) {
         Box(
             Modifier
                 .size(38.dp)
@@ -154,6 +160,14 @@ internal fun AdviceRow(
                         Text("in $acceptedIn", style = AppType.Caption, color = AppColors.TextTertiary, modifier = Modifier.weight(1f))
                     }
                 }
+            }
+        }
+        if (onDismiss != null) {
+            Box(
+                Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.Close, contentDescription = "Close for today, it comes back tomorrow", tint = AppColors.TextTertiary, modifier = Modifier.size(18.dp))
             }
         }
     }

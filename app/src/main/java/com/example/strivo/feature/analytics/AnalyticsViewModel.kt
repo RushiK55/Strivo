@@ -90,7 +90,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             planned = repository.plannedExercises()
             activities = repository.readActivities()
             scheduledPlans = repository.readAllPlans()
-                .filter { !it.isPrebuilt && it.planName != EXTRA_PLAN_NAME }
+                .filter { !it.isPrebuilt && it.planName != EXTRA_PLAN_NAME && !it.isOneOff }
                 .mapNotNull { plan -> DayOfWeek.entries.firstOrNull { dayName(it) == plan.planDay } }
                 .groupingBy { it }
                 .eachCount()

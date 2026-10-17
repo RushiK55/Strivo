@@ -34,6 +34,7 @@ import com.example.strivo.core.ui.components.Card
 import com.example.strivo.core.ui.components.StatTile
 import com.example.strivo.core.ui.theme.AppColors
 import com.example.strivo.core.ui.theme.AppType
+import com.example.strivo.domain.analytics.AnalyticsRange
 import com.example.strivo.domain.analytics.AnalyticsReport
 import com.example.strivo.domain.analytics.BodyReport
 import com.example.strivo.domain.analytics.ExpenditureMinLoggedDays
@@ -73,7 +74,7 @@ internal fun LazyListScope.nutritionTab(
             AccentTitle("Calories eaten")
             Spacer(Modifier.height(12.dp))
             if (nutrition.isEmpty) {
-                MissingData("Nothing logged in the last ${nutrition.range.label}. Log what you eat and your intake shows up here.")
+                MissingData("Nothing logged ${nutrition.range.let { if (it == AnalyticsRange.Today) "today yet" else "in ${it.phrase}" }}. Log what you eat and your intake shows up here.")
             } else {
                 EatenCard(nutrition, body.weight?.latest?.kg ?: body.profile.weightKg)
             }
@@ -94,7 +95,7 @@ internal fun LazyListScope.nutritionTab(
             if (burned == null) {
                 MissingData("Add your weight in Profile and Strivo will estimate the calories your workouts burn. You can also add other activity below.")
             } else if (burned <= 0.0) {
-                MissingData("No workouts or other activity in the last ${report.range.label}, so there is nothing burned to show.")
+                MissingData("No workouts or other activity ${report.range.let { if (it == AnalyticsRange.Today) "today yet" else "in ${it.phrase}" }}, so there is nothing burned to show.")
             } else {
                 CaloriesCard(report, burned)
             }

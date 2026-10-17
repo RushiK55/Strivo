@@ -84,12 +84,20 @@ class ExerciseViewModel(application: Application) : AndroidViewModel(application
         reloadDay(selectedDay())
     }
 
-    /** Every exercise the user has, one per name (its newest version), A to Z: the list to pick an extra exercise from. */
-    suspend fun knownExercises(): List<Exercise> =
-        repository.readAllExercises()
+    /**
+     * Every exercise to pick an extra one from, one per name, A to Z: the ones the user has (their newest version, so their own sets,
+     * reps and weight) and every exercise of the exercise library that they do not have yet (with its suggested sets, reps and weight).
+     */
+    suspend fun knownExercises(): List<Exercise> {
+        val own = repository.readAllExercises()
             .sortedByDescending { it.id ?: 0L }
             .distinctBy { it.name.trim().lowercase() }
-            .sortedBy { it.name.lowercase() }
+        val have = own.map { it.name.trim().lowercase() }.toSet()
+        val fromLibrary = repository.readLibrary()
+            .filter { it.name.trim().lowercase() !in have }
+            .map { it.toPlanExercise(planId = -1L) }
+        return (own + fromLibrary).sortedBy { it.name.lowercase() }
+    }
 
     /** Adds several exercises (in order) to the end of their plan, refreshing the lists once. */
     suspend fun addExercises(exercises: List<Exercise>) {

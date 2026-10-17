@@ -28,6 +28,7 @@ import com.example.strivo.domain.coach.exerciseKey
 import com.example.strivo.domain.model.EXTRA_PLAN_NAME
 import com.example.strivo.domain.model.Exercise
 import com.example.strivo.domain.model.LibraryExercise
+import com.example.strivo.domain.model.ONE_OFF_ORIGIN
 import com.example.strivo.domain.model.PREBUILT_DAY
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.TRAINER_ORIGIN
@@ -100,6 +101,22 @@ class StrivoRepository(
         db.readExercisesByPlan(sourceId).filter { it.isPlanned }.forEach { db.createExercise(it.freshCopyFor(newId)) }
         if (log) record(planCopied(source, day, now()))
         return newId
+    }
+
+    /**
+     * Adds a plan to [day] for that day only: a real plan on the day (it counts as a plan to do, can be started and finished, and shows
+     * in the analytics like any other), with fresh copies of [exercises]. It is not linked to anything, so nothing done in it changes the
+     * plan it came from, and it is gone the next morning. Returns the day's plan id.
+     */
+    suspend fun addOneOffPlan(name: String, exercises: List<Exercise>, day: String): Long = io {
+        val plan = Plan(planName = name, planDay = day, origin = ONE_OFF_ORIGIN)
+        val fresh = exercises.map {
+            it.copy(
+                id = null, sourceId = null, isCheck = false, dateTime = "", restTime = "", sortOrder = -1,
+                setsList = emptyList(), isExtra = false, vanishEndOfDay = false,
+            )
+        }
+        db.importPlan(plan, fresh, planCopied(plan, day, now()))
     }
 
     /**
@@ -245,6 +262,7 @@ class StrivoRepository(
             restTime = "",
             sortOrder = -1,
             setsList = emptyList(),
+            sourceId = null, // a copy is its own exercise; it is linked to a plan's exercise only by the plan it is added to
         )
         db.createExercise(copy).also { id ->
             addToUsersPlan(id, copy)
@@ -303,6 +321,7 @@ class StrivoRepository(
         if (prefs.consumeDailyReset()) {
             db.resetAllExerciseChecks()
             db.deleteDailyExercises()
+            db.deleteOneOffPlans()
             startDaysFromUsersPlans()
         }
     }
@@ -426,6 +445,12 @@ class StrivoRepository(
 
     /** The exercises users can browse: the ones an admin has not hidden. */
     suspend fun readLibrary(): List<LibraryExercise> = io { db.readLibrary().filter { it.active } }
+
+    // --- Closed for today ---
+
+    suspend fun snoozedToday(): Set<String> = io { prefs.snoozedToday() }
+
+    suspend fun snoozeToday(key: String) = io { prefs.snoozeToday(key) }
 
     // --- Plan library ---
 

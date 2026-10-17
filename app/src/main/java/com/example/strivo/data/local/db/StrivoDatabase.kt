@@ -219,8 +219,8 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
     fun plannedDayCount(): Int {
         val days = com.example.strivo.core.util.WeekDays.joinToString(",") { "'$it'" }
         return readableDatabase.rawQuery(
-            "SELECT COUNT(DISTINCT planDay) FROM plans WHERE isDemo = 0 AND planDay IN ($days) AND planName != ?",
-            arrayOf(com.example.strivo.domain.model.EXTRA_PLAN_NAME),
+            "SELECT COUNT(DISTINCT planDay) FROM plans WHERE isDemo = 0 AND planDay IN ($days) AND planName != ? AND origin != ?",
+            arrayOf(com.example.strivo.domain.model.EXTRA_PLAN_NAME, com.example.strivo.domain.model.ONE_OFF_ORIGIN),
         ).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
     }
 
@@ -285,6 +285,14 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
             "planName = ? AND planId NOT IN (SELECT DISTINCT planId FROM exercises)",
             arrayOf(name),
         )
+
+    /** Removes the plans that were added for one day only, with their exercises (the next morning). */
+    fun deleteOneOffPlans(): Int {
+        val db = writableDatabase
+        val one = arrayOf(com.example.strivo.domain.model.ONE_OFF_ORIGIN)
+        db.execSQL("DELETE FROM exercises WHERE planId IN (SELECT planId FROM plans WHERE origin = ?)", one)
+        return db.delete("plans", "origin = ?", one)
+    }
 
     fun updatePlan(plan: Plan): Int =
         writableDatabase.update("plans", plan.toValues(), "planId = ?", arrayOf(plan.planId.toString()))

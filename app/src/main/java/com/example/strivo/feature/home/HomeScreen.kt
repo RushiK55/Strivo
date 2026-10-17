@@ -100,7 +100,12 @@ fun HomeScreen(
     val plans by planViewModel.plans.collectAsStateWithLifecycle()
     val offers by planViewModel.offers.collectAsStateWithLifecycle()
     val notice by planViewModel.notice.collectAsStateWithLifecycle()
+    val snoozed by planViewModel.snoozed.collectAsStateWithLifecycle()
+    // What the user closed today stays hidden until tomorrow, when it comes back if it is still true.
+    val shownOffers = offers.filter { "offer:" + it.ids.joinToString(",") !in snoozed }
+    val shownAdvice = advice.filter { "advice:${it.kind}:${it.exercise.orEmpty()}" !in snoozed }
     val context = LocalContext.current
+    AskToAllowNotifications()
     // What accepting did ("Added 7 plans to your week"), said once.
     LaunchedEffect(notice) {
         notice?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show(); planViewModel.clearNotice() }
@@ -132,6 +137,7 @@ fun HomeScreen(
     var planToDelete by remember { mutableStateOf<Plan?>(null) }
     var showExtraSheet by remember { mutableStateOf(false) }
     var knownExercises by remember { mutableStateOf<List<Exercise>>(emptyList()) }
+    var planChoices by remember { mutableStateOf<List<com.example.strivo.feature.plans.PlanChoice>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -217,10 +223,15 @@ fun HomeScreen(
             }
 
             // Plans the trainer sent that are waiting for an answer: one card for a week's worth, with Accept and Decline
-            if (offers.isNotEmpty()) {
+            if (shownOffers.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(16.dp))
-                    TrainerOffersCard(offers = offers, onAccept = planViewModel::acceptOffer, onDecline = planViewModel::declineOffer)
+                    TrainerOffersCard(
+                        offers = shownOffers,
+                        onAccept = planViewModel::acceptOffer,
+                        onDecline = planViewModel::declineOffer,
+                        onClose = { planViewModel.snooze("offer:" + it.ids.joinToString(",")) },
+                    )
                 }
             }
 
@@ -308,6 +319,7 @@ fun HomeScreen(
                             .clickable {
                                 scope.launch {
                                     knownExercises = exerciseViewModel.knownExercises()
+                                    planChoices = planViewModel.planChoices()
                                     showExtraSheet = true
                                 }
                             }
@@ -330,12 +342,19 @@ fun HomeScreen(
             }
 
             // The coach: the few things most worth doing next, from the user's own logs.
-            if (advice.isNotEmpty()) {
+            if (shownAdvice.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(28.dp))
                     AccentTitle("For you", modifier = Modifier.padding(start = 4.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
-                    AdviceCard(advice, limit = 3, onSeeAll = onOpenCoach, acceptLabel = acceptLabel, onAccept = onAcceptAdvice)
+                    AdviceCard(
+                        shownAdvice,
+                        limit = 3,
+                        onSeeAll = onOpenCoach,
+                        acceptLabel = acceptLabel,
+                        onAccept = onAcceptAdvice,
+                        onDismiss = { planViewModel.snooze("advice:${it.kind}:${it.exercise.orEmpty()}") },
+                    )
                 }
             }
         }
@@ -373,12 +392,21 @@ fun HomeScreen(
         ExtraExerciseSheet(
             day = selectedDay,
             exercises = knownExercises,
+            plans = planChoices,
             addedNames = addedNames,
+            addedPlanNames = plansForDay.map { it.planName.trim().lowercase() }.toSet(),
             onAdd = { exercise ->
                 scope.launch {
                     val planId = planViewModel.extraPlanFor(selectedDay)
                     // Extras are one-offs by default; a copy keeps the sets, reps, weight and notes.
                     exerciseViewModel.copyExerciseToPlan(exercise.copy(vanishEndOfDay = true), planId)
+                }
+            },
+            onAddPlan = { choice ->
+                scope.launch {
+                    // A real plan on the day for today only, like the extra plan: it counts, can be started, and goes tomorrow.
+                    planViewModel.addOneOffPlan(choice, selectedDay)
+                    exerciseViewModel.loadExercisesByDay(selectedDay)
                 }
             },
             onNew = {

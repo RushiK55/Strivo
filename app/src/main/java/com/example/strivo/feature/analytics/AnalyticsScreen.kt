@@ -174,12 +174,12 @@ fun AnalyticsScreen(
 
 // --- Range ---
 
-/** "Last 7 days / Last 30 days" as small chips under the tabs. */
+/** "Today / Last 7 days / Last 30 days / Last 90 days" as small chips under the tabs. */
 @Composable
 private fun RangeSelector(selected: AnalyticsRange, onSelect: (AnalyticsRange) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         AnalyticsRange.entries.forEach { range ->
-            Chip("Last ${range.label}", selected = range == selected) { onSelect(range) }
+            Chip(range.chip, selected = range == selected) { onSelect(range) }
         }
     }
 }
@@ -190,7 +190,7 @@ private fun EmptyAnalytics(range: AnalyticsRange) {
         Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             IconBadge(icon = Icons.Rounded.BarChart, padding = 16.dp, iconSize = 32.dp)
             Spacer(Modifier.height(16.dp))
-            Text("No workouts in the last ${range.label}", style = AppType.Headline, color = AppColors.TextPrimary)
+            Text("No workouts ${if (range == AnalyticsRange.Today) "today yet" else "in ${range.phrase}"}", style = AppType.Headline, color = AppColors.TextPrimary)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Finish a workout and your analytics will show up here.",
