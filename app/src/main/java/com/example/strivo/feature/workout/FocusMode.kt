@@ -104,6 +104,15 @@ internal fun focusTarget(state: WorkoutState): FocusInfo? {
 }
 
 /**
+ * Whether the phone can blur what is behind a view (Android 12 and later). On Android 11 and older `Modifier.blur` does nothing, so the
+ * list would stay sharp behind a thin dark layer and look see-through; there the dark layer is made nearly solid instead.
+ */
+internal val CanBlur: Boolean = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
+
+/** How dark the layer over the workout list is: light over a blur, nearly solid where there is no blur. */
+internal val FocusScrimAlpha: Float = if (CanBlur) 0.55f else 0.94f
+
+/**
  * Full-screen focus view over the blurred workout list. One big round button: START for the next set
  * (accent), STOP while a set runs (orange). The list only shows again when the user closes this view.
  */
@@ -113,7 +122,7 @@ internal fun FocusOverlay(visible: Boolean, info: FocusInfo?, viewModel: Workout
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(Color.Black.copy(alpha = FocusScrimAlpha))
                 // Swallow touches so nothing behind the overlay can be tapped.
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
         )
