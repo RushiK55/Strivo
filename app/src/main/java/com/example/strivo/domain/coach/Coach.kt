@@ -18,7 +18,8 @@ import kotlin.math.roundToInt
  * message says why it fired, so a suggestion can always be checked against what the user remembers doing.
  */
 
-enum class AdviceKind { IncreaseWeight, Deload, FastLoss, FastGain, Protein, WeighIn, Inactive }
+// The order is the priority: a habit of skipping an exercise comes first, then the weights, then the body.
+enum class AdviceKind { Skipped, IncreaseWeight, Deload, FastLoss, FastGain, Protein, WeighIn, Inactive }
 
 data class Advice(
     val kind: AdviceKind,
@@ -27,6 +28,8 @@ data class Advice(
     /** Training advice is about one exercise, with the weight to use next time. */
     val exercise: String? = null,
     val suggestedKg: Double? = null,
+    /** A skipped exercise is about one plan: its name, so the advice can take the exercise out of that plan. */
+    val planName: String? = null,
 ) {
     /** Lower comes first: a stalled lift before a missing weigh-in. */
     val priority: Int get() = kind.ordinal
@@ -197,6 +200,43 @@ fun activityAdvice(sessions: List<WorkoutSession>, today: LocalDate): Advice? {
     )
 }
 
+/** Workouts of one plan the coach looks at when it checks for a habit of skipping. */
+const val SkipLookback = 4
+
+/** Times an exercise must have been skipped in those workouts, the latest one included, for the coach to say something. */
+const val SkipsToSpeak = 3
+
+private const val SkipWindowDays = 60L
+
+/**
+ * An exercise that keeps being left out of a plan's workouts: skipped in at least [SkipsToSpeak] of the last [SkipLookback] times
+ * the plan was finished, and in the latest one. Doing it once clears the advice. It asks the user to decide (lower it, swap it, take
+ * it out of the plan) so skipping it again and again does not go on unnoticed.
+ */
+fun skipAdvice(sessions: List<WorkoutSession>, today: LocalDate): List<Advice> {
+    val since = today.minusDays(SkipWindowDays)
+    return sessions
+        .filter { it.date.toLocalDate() >= since }
+        .groupBy { it.planName }
+        .flatMap { (plan, all) ->
+            val recent = all.sortedByDescending { it.date }.take(SkipLookback)
+            if (recent.size < SkipsToSpeak) return@flatMap emptyList()
+            recent.first().skipped.mapNotNull { name ->
+                val key = exerciseKey(name)
+                val times = recent.count { session -> session.skipped.any { exerciseKey(it) == key } }
+                if (times < SkipsToSpeak) return@mapNotNull null
+                Advice(
+                    AdviceKind.Skipped,
+                    "You keep skipping $name",
+                    "You left it out of $times of your last ${recent.size} $plan workouts. Skipping an exercise again and again " +
+                        "leaves that muscle behind: lower the sets, swap it for one you will do, or take it out of the plan.",
+                    exercise = name,
+                    planName = plan,
+                )
+            }
+        }
+}
+
 /** Everything the coach has to say, most important first. */
 fun coachAdvice(
     histories: List<ExerciseHistory>,
@@ -209,6 +249,7 @@ fun coachAdvice(
     val weightKg = body.trend.lastOrNull()?.trendKg ?: body.profile.weightKg
     return (
         histories.mapNotNull { progressionAdvice(it, today) } +
+            skipAdvice(sessions, today) +
             bodyAdvice(body, weightLog, today) +
             listOfNotNull(proteinAdvice(food, weightKg, today), activityAdvice(sessions, today))
         ).sortedWith(compareBy<Advice> { it.priority }.thenBy { it.exercise.orEmpty().lowercase() })
@@ -268,6 +309,8 @@ data class PlannedExercise(val planName: String, val planDay: String, val weight
  * library of plans, or "3 plans" (the weekday plans and the library together). Null if nowhere.
  */
 fun Advice.acceptedIn(planned: List<PlannedExercise>?): String? {
+    // Taking a skipped exercise out of its plan changes that plan, whatever the weight.
+    if (kind == AdviceKind.Skipped) return planName?.takeIf { !planned.isNullOrEmpty() }
     if (suggestedKg == null || planned.isNullOrEmpty()) return null
     val plans = planned.distinctBy { it.planName to it.planDay }
     val only = plans.singleOrNull() ?: return "${plans.size} plans"

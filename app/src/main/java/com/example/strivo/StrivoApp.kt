@@ -44,7 +44,10 @@ class StrivoApp : Application() {
     var activeUid: String? = null
         private set
 
-    /** Goes up whenever data from the cloud was written into the phone's database, so screens know to reload. */
+    /**
+     * Goes up whenever data was written into the phone's database behind the screens' backs (from the cloud, or by the coach changing the
+     * plans), so the screens that show it know to reload.
+     */
     private val _cloudDataVersion = MutableStateFlow(0)
     val cloudDataVersion: StateFlow<Int> = _cloudDataVersion
 
@@ -73,6 +76,11 @@ class StrivoApp : Application() {
                 activeScope()?.sync?.requestSync(pull = true)
             }
         })
+    }
+
+    /** Tells the screens that data changed under them (see [cloudDataVersion]). */
+    fun dataChanged() {
+        _cloudDataVersion.update { it + 1 }
     }
 
     fun setActiveUser(uid: String?) {

@@ -41,6 +41,8 @@ fun ExerciseDetailsScreen(
     plan: Plan,
     onBack: () -> Unit,
     onStartWorkout: () -> Unit,
+    /** False when the plan is only being looked at (the day is done, or has passed): no button to start it. */
+    canStart: Boolean = true,
 ) {
     CollapsingListScreen(
         title = exercise.name,
@@ -132,7 +134,7 @@ fun ExerciseDetailsScreen(
             }
         }
 
-        item {
+        if (canStart) item {
             AccentButton(
                 text = if (exercise.isCheck) "Restart workout" else "Start workout",
                 onClick = onStartWorkout,

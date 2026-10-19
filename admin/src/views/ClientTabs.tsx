@@ -299,6 +299,7 @@ function WorkoutsTab({ workouts }: { workouts: WorkoutRow[] }) {
           {workouts.slice(paging.start, paging.end).map((session) => {
             const exercises = parseJsonField<SessionExercise[]>(session.exercises, []);
             const volume = sessionVolume(exercises);
+            const skipped = parseJsonField<string[]>(session.skipped, []).filter((name): name is string => typeof name === 'string');
             return (
               <AccordionItem key={session.id} value={session.id}>
                 <AccordionTrigger>
@@ -306,6 +307,7 @@ function WorkoutsTab({ workouts }: { workouts: WorkoutRow[] }) {
                     <strong>{session.planName || 'Workout'}</strong>
                     <span className="text-muted-foreground">{` · ${String(session.date || '').replace('T', ' ').slice(0, 16)}`}</span>
                     <span>{` · ${durationText(session.totalTime) || '–'} · ${exercises.length} ${exercises.length === 1 ? 'exercise' : 'exercises'}`}{volume > 0 ? ` · ${fmtNumber(Math.round(volume))} kg` : ''}</span>
+                    {skipped.length ? <span className="text-muted-foreground">{` · skipped ${skipped.length}`}</span> : null}
                     <DemoBadge row={session} />
                   </span>
                 </AccordionTrigger>
@@ -318,6 +320,7 @@ function WorkoutsTab({ workouts }: { workouts: WorkoutRow[] }) {
                       ))}
                     </TableBody>
                   </Table>
+                  {skipped.length ? <p className="mt-2 text-sm text-muted-foreground">{`Left out of this workout: ${skipped.join(', ')}.`}</p> : null}
                 </AccordionContent>
               </AccordionItem>
             );

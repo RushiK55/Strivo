@@ -10,7 +10,7 @@ import com.example.strivo.domain.activity.withoutFoodName
  */
 internal object Schema {
     /** Bump when a table changes, and add a step for it to [upgrade]. */
-    const val VERSION = 19
+    const val VERSION = 20
 
     /** The tables demo data writes to, which carry the isDemo mark. */
     val DemoTables = listOf("workout_sessions", "exercises", "plans", "food_log", "activity_log", "weight_log")
@@ -142,6 +142,7 @@ internal object Schema {
         addDemoColumns(db)
         addPlannedDropSets(db)
         addPlanLinks(db)
+        addSessionSkips(db)
         createSyncObjects(db)
     }
 
@@ -232,6 +233,8 @@ internal object Schema {
             db.execSQL(CREATE_LIBRARY_PLANS)
             addPlanLinks(db)
         }
+        // A workout remembers the exercises it left out (workout_sessions.skipped), for the coach.
+        if (oldVersion < 20) addSessionSkips(db)
     }
 
     private fun removeFoodNamesFromEvents(db: SQLiteDatabase) {
@@ -261,6 +264,9 @@ internal object Schema {
         addColumnIfMissing(db, "plans", "origin", "TEXT NOT NULL DEFAULT ''")
         addColumnIfMissing(db, "exercises", "sourceId", "INTEGER")
     }
+
+    /** The exercises a workout left out when it was finished early (a JSON list of names); it goes to the cloud with the workout. */
+    private fun addSessionSkips(db: SQLiteDatabase) = addColumnIfMissing(db, "workout_sessions", "skipped", "TEXT NOT NULL DEFAULT ''")
 
     private fun addColumnIfMissing(db: SQLiteDatabase, table: String, column: String, definition: String) {
         val has = db.rawQuery("PRAGMA table_info($table)", null).use { c ->

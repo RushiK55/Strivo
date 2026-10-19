@@ -17,6 +17,7 @@ import com.example.strivo.domain.model.PerformedExercise
 import com.example.strivo.domain.model.Plan
 import com.example.strivo.domain.model.SetType
 import com.example.strivo.domain.model.WorkoutSession
+import com.example.strivo.domain.plan.isPlanned
 import com.example.strivo.domain.model.blockingSetBefore
 import com.example.strivo.domain.model.countsForRecords
 import com.example.strivo.domain.model.isWork
@@ -56,6 +57,7 @@ class WorkoutViewModel(
     private val setWatch = Stopwatch()
     private val saveMutex = Mutex()
     private var savedSessionId: Long? = null // set once the workout has been saved to history
+    private var loggedMillis = 0L // the time of sets logged afterwards: the workout clock never ran for them
 
     private val _state = MutableStateFlow(WorkoutState())
     val state: StateFlow<WorkoutState> = _state
@@ -123,6 +125,7 @@ class WorkoutViewModel(
      * after that it is PAUSE (stops the clocks, including the running set's) and RESUME (starts them again).
      */
     fun startStopWorkout() {
+        if (_state.value.isFinished) return
         when {
             workoutWatch.isRunning -> pauseWorkout()
             workoutWatch.elapsedMillis > 0L -> resumeWorkout()
@@ -293,6 +296,10 @@ class WorkoutViewModel(
 
     /** The play / pause / check button on a set row. */
     fun onSetButton(exerciseIndex: Int, setIndex: Int) {
+        if (_state.value.isFinished) {
+            message("This workout is finished for today", MessageKind.Warning)
+            return
+        }
         // While paused nothing may start or finish; the tap just resumes the workout.
         if (_state.value.isPaused) {
             resumeWorkout()
@@ -415,8 +422,33 @@ class WorkoutViewModel(
         if (isLastExercise) finishWorkout()
     }
 
+    /**
+     * An exercise that was done without the timer: [logged] are the sets as the user remembers them. They are saved as done
+     * (with the time of each when it is known), the exercise is ticked off, and the time goes into the workout's total.
+     */
+    fun logExercise(exerciseIndex: Int, logged: List<ExerciseSet>) {
+        val current = _state.value
+        if (current.isFinished) return
+        val exercise = current.exercises.getOrNull(exerciseIndex) ?: return
+        if (logged.isEmpty() || logged.any { it.reps <= 0 }) return
+        if (current.activeSetExerciseIndex == exerciseIndex) {
+            message("Finish the set that is running first", MessageKind.Warning)
+            return
+        }
+        loggedMillis += logged.sumOf { setTimeSeconds(it.setDuration) } * 1000L
+        val isLastExercise = current.exercises.all { it.isCheck || it.id == exercise.id }
+        commit(exerciseIndex, exercise.copy(setsList = exercise.setsList.filter { it.isCompleted } + logged, isCheck = true))
+        _state.update { it.copy(currentExerciseIndex = null) }
+        setExpanded(exerciseIndex, false)
+        val next = _state.value.exercises.indices.firstOrNull { !_state.value.exercises[it].isCheck }
+        if (next != null) setExpanded(next, true)
+        message("${exercise.name} logged", MessageKind.Info)
+        if (isLastExercise) finishWorkout()
+    }
+
     private fun finishWorkout() {
         endWorkout(finished = true)
+        _state.update { it.copy(isFinished = true) }
         eventChannel.trySend(WorkoutEvent.ShowComplete)
     }
 
@@ -461,7 +493,7 @@ class WorkoutViewModel(
     private fun endWorkout(finished: Boolean) {
         workoutWatch.stop()
         syncWorkoutRunning()
-        val duration = formatDuration(workoutWatch.elapsedMillis)
+        val duration = formatDuration(workoutWatch.elapsedMillis + loggedMillis)
         _workoutTime.value = duration
         saveCompletedWorkout(duration, finished)
     }
@@ -476,6 +508,10 @@ class WorkoutViewModel(
         val date = LocalDateTime.now()
         // The exercises this workout dealt with: all of them when it was finished, only those ticked off when it was left.
         val planExerciseIds = _state.value.exercises.filter { finished || it.isCheck }.mapNotNull { it.id }.toSet()
+        // Finished on purpose with an exercise of the plan not done at all: it was skipped (the coach notices a habit of it).
+        val skippedNow = if (!finished) emptyList() else _state.value.exercises
+            .filter { it.isPlanned && it.setsList.none { set -> set.isCompleted } }
+            .map { it.name }
         // NonCancellable: leaving the screen clears this view model, and the save must still finish.
         viewModelScope.launch {
             withContext(NonCancellable) {
@@ -490,7 +526,8 @@ class WorkoutViewModel(
                         .toSet()
                     val exercises = performed.filter { it.name.trim().lowercase() !in saved }
                     if (exercises.isEmpty()) return@withLock
-                    val session = WorkoutSession(planName = plan.planName, date = date, totalTime = duration, exercises = exercises)
+                    val skipped = skippedNow.filter { it.trim().lowercase() !in saved }
+                    val session = WorkoutSession(planName = plan.planName, date = date, totalTime = duration, exercises = exercises, skipped = skipped)
                     savedSessionId = repository.saveSession(session, savedSessionId)
                 }
             }

@@ -67,6 +67,8 @@ fun WorkoutScreen(
     var picker by remember { mutableStateOf<Picker?>(null) }
     // The exercise whose notes and details are open (its index in the workout), or none.
     var infoFor by remember { mutableStateOf<Int?>(null) }
+    // The exercise being logged after the fact (done without the timer), by its index in the workout, or none.
+    var logFor by remember { mutableStateOf<Int?>(null) }
     val library by viewModel.library.collectAsStateWithLifecycle()
     var summaryExerciseIndex by remember { mutableStateOf<Int?>(null) }
     var showComplete by remember { mutableStateOf(false) }
@@ -85,7 +87,11 @@ fun WorkoutScreen(
             when (event) {
                 is WorkoutEvent.Message -> snackbarHost.showColored(
                     event.text,
-                    if (event.kind == MessageKind.Warning) AppColors.Warning else AppColors.Danger,
+                    when (event.kind) {
+                        MessageKind.Info -> null
+                        MessageKind.Warning -> AppColors.Warning
+                        MessageKind.Error -> AppColors.Danger
+                    },
                 )
 
                 is WorkoutEvent.ShowSummary -> summaryExerciseIndex = event.exerciseIndex
@@ -152,6 +158,7 @@ fun WorkoutScreen(
                         doneExercises = state.exercises.count { it.isCheck },
                         totalExercises = state.exercises.size,
                         modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
+                        finished = state.isFinished,
                     )
                 }
                 if (state.showRestTimer && !state.isExerciseRest) {
@@ -168,6 +175,7 @@ fun WorkoutScreen(
                             onPickWeight = { setIndex, set -> picker = Picker.Weight(index, setIndex, set.weight) },
                             onPickReps = { setIndex, set -> picker = Picker.Reps(index, setIndex, if (set.reps == 0) 10 else set.reps) },
                             onInfo = { infoFor = index },
+                            onLog = { logFor = index },
                         )
                         PostExerciseRest(index, exercise, viewModel)
                     }
@@ -198,6 +206,19 @@ fun WorkoutScreen(
                 exercise = exercise,
                 details = library.firstOrNull { exerciseKey(it.name) == exerciseKey(exercise.name) },
                 onDismiss = { infoFor = null },
+            )
+        }
+    }
+
+    logFor?.let { index ->
+        state.exercises.getOrNull(index)?.let { exercise ->
+            LogExerciseSheet(
+                exercise = exercise,
+                onDismiss = { logFor = null },
+                onSave = { sets ->
+                    logFor = null
+                    viewModel.logExercise(index, sets)
+                },
             )
         }
     }

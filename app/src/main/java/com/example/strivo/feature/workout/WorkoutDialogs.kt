@@ -65,6 +65,19 @@ internal fun RepsPickerDialog(initial: Int, onDismiss: () -> Unit, onSelected: (
     }
 }
 
+/** How long a set took, in minutes and seconds; 00:00 leaves the time out. */
+@Composable
+internal fun TimePickerDialog(initialSeconds: Int, onDismiss: () -> Unit, onSelected: (Int) -> Unit) {
+    var minutes by remember { mutableStateOf((initialSeconds / 60).coerceAtMost(59)) }
+    var seconds by remember { mutableStateOf(initialSeconds % 60) }
+    PickerDialog(title = "Time of the set", onDismiss = onDismiss, onSet = { onSelected(minutes * 60 + seconds) }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            WheelPicker(minValue = 0, maxValue = 59, initialValue = minutes, onChanged = { minutes = it }, label = "min")
+            WheelPicker(minValue = 0, maxValue = 59, initialValue = seconds, onChanged = { seconds = it }, label = "sec")
+        }
+    }
+}
+
 @Composable
 private fun PickerDialog(title: String, onDismiss: () -> Unit, onSet: () -> Unit, content: @Composable () -> Unit) {
     AlertDialog(

@@ -26,6 +26,7 @@ import com.example.strivo.domain.analytics.exerciseHistories
 import com.example.strivo.domain.analytics.recentRecords
 import com.example.strivo.domain.analytics.weightAt
 import com.example.strivo.domain.coach.Advice
+import com.example.strivo.domain.coach.AdviceKind
 import com.example.strivo.domain.coach.PlannedExercise
 import com.example.strivo.domain.coach.acceptedIn
 import com.example.strivo.domain.coach.coachAdvice
@@ -106,10 +107,20 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
     /** Accepts the coach's advice: its weight becomes the planned weight of that exercise in every plan. */
     fun acceptAdvice(advice: Advice) {
         val name = advice.exercise ?: return
+        if (advice.kind == AdviceKind.Skipped) {
+            val plan = advice.planName ?: return
+            viewModelScope.launch {
+                repository.removeExerciseFromPlansNamed(plan, name)
+                load()
+                app.dataChanged() // Home shows the plan's exercises: it reloads them
+            }
+            return
+        }
         val kg = advice.suggestedKg ?: return
         viewModelScope.launch {
             repository.setPlannedWeight(name, kg)
             load()
+            app.dataChanged()
         }
     }
 
@@ -174,7 +185,9 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
                 expenditure = estimateExpenditure(food, weightLog, today),
                 // Advice the plans already follow has been accepted (or done by hand): nothing left to say.
                 advice = coachAdvice(exercises, body, weightLog, food, sessions, today)
-                    .filterNot { advice -> advice.exercise?.let { advice.isInPlans(planned[exerciseKey(it)]?.map { p -> p.weightKg }) } ?: false },
+                    .filterNot { advice -> advice.exercise?.let { advice.isInPlans(planned[exerciseKey(it)]?.map { p -> p.weightKg }) } ?: false }
+                    // A skipped exercise already taken out of its plan has nothing left to say.
+                    .filterNot { advice -> advice.kind == AdviceKind.Skipped && planned[exerciseKey(advice.exercise.orEmpty())]?.any { it.planName == advice.planName } != true },
                 plannedExercises = planned,
             )
         }

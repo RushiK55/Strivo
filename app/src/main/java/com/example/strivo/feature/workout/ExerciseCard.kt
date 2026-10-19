@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Icon
@@ -86,6 +87,8 @@ internal fun ExerciseItem(
     onPickReps: (Int, ExerciseSet) -> Unit,
     /** Opens everything about this exercise: its notes, how it is done, the tip, the muscles. */
     onInfo: () -> Unit = {},
+    /** Opens the sheet to fill in an exercise that was done without the timer. */
+    onLog: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val expanded = exerciseIndex in state.expandedExercises
@@ -247,6 +250,17 @@ internal fun ExerciseItem(
                             Spacer(Modifier.width(6.dp))
                             Text("Remove", style = AppType.BodyStrong, color = AppColors.TextSecondary)
                         }
+                    }
+                }
+                // For an exercise that was done but not timed: fill it in now instead of running every set.
+                if (!exercise.isCheck && !state.isFinished && !hasActiveSet) {
+                    TextButton(
+                        onClick = onLog,
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                    ) {
+                        Icon(Icons.Rounded.EditNote, contentDescription = null, tint = AppColors.TextSecondary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Already did it? Log it", style = AppType.BodyStrong, color = AppColors.TextSecondary)
                     }
                 }
                 // Only offered once every set is done; until then the sets themselves are the next step.

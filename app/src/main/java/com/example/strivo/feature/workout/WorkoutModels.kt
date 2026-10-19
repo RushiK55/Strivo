@@ -6,6 +6,8 @@ data class WorkoutState(
     val isLoading: Boolean = true,
     val exercises: List<Exercise> = emptyList(),
     val isWorkoutRunning: Boolean = false,
+    /** The workout was finished (all of it, or early): it is done for the day, and nothing in it can be started again. */
+    val isFinished: Boolean = false,
     /** The main button paused the workout: every clock (workout, set and rest) is frozen until it is resumed. */
     val isPaused: Boolean = false,
     val showRestTimer: Boolean = false,
@@ -24,7 +26,7 @@ data class WorkoutState(
     val lastSavedSet: String? = null,
 )
 
-enum class MessageKind { Warning, Error }
+enum class MessageKind { Info, Warning, Error }
 
 sealed interface WorkoutEvent {
     data class Message(val text: String, val kind: MessageKind) : WorkoutEvent

@@ -99,6 +99,7 @@ internal fun Cursor.toSession() = WorkoutSession(
     date = LocalDateTime.parse(getStringOrEmpty("date")),
     totalTime = getStringOrEmpty("totalTime"),
     exercises = WorkoutSession.exercisesFromJson(getStringOrEmpty("exercises")),
+    skipped = WorkoutSession.skippedFromJson(getStringOrEmpty("skipped").ifEmpty { null }),
 )
 internal fun Cursor.getStringOrEmpty(column: String, default: String = ""): String {
     val index = getColumnIndexOrThrow(column)

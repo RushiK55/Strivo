@@ -64,6 +64,8 @@ export interface WorkoutRow {
   date?: string;
   totalTime?: string;
   exercises?: string | SessionExercise[];
+  /** The exercises of the plan left out when the client finished the workout early, as JSON text (a list of names). */
+  skipped?: string;
   isDemo?: number;
 }
 

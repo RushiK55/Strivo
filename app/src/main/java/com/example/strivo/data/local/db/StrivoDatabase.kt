@@ -490,6 +490,7 @@ class StrivoDatabase(context: Context, uid: String) : SQLiteOpenHelper(context, 
             put("date", DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(session.date))
             put("totalTime", session.totalTime)
             put("exercises", session.exercisesJson())
+            put("skipped", session.skippedJson())
         }
         val db = writableDatabase
         if (replaceId != null && db.update("workout_sessions", values, "id = ?", arrayOf(replaceId.toString())) > 0) {

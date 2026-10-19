@@ -48,6 +48,7 @@ import com.example.strivo.domain.coach.AdviceKind
 private fun AdviceKind.icon(): ImageVector = when (this) {
     AdviceKind.IncreaseWeight -> Icons.AutoMirrored.Rounded.TrendingUp
     AdviceKind.Deload -> Icons.AutoMirrored.Rounded.TrendingDown
+    AdviceKind.Skipped -> Icons.Rounded.FitnessCenter
     AdviceKind.FastLoss, AdviceKind.FastGain -> Icons.Rounded.Speed
     AdviceKind.Protein -> Icons.Rounded.Restaurant
     AdviceKind.WeighIn -> Icons.Rounded.MonitorWeight
@@ -57,6 +58,7 @@ private fun AdviceKind.icon(): ImageVector = when (this) {
 private fun AdviceKind.tint(): Color = when (this) {
     AdviceKind.IncreaseWeight -> AppColors.Accent
     AdviceKind.Deload -> AppColors.SetWarmUp
+    AdviceKind.Skipped -> AppColors.Warning
     AdviceKind.FastLoss, AdviceKind.FastGain -> AppColors.Warning
     AdviceKind.Protein -> AppColors.Success
     AdviceKind.WeighIn, AdviceKind.Inactive -> AppColors.TextSecondary
@@ -90,7 +92,11 @@ internal fun AdviceCard(
                 onAccept = where?.let {
                     {
                         onAccept(item)
-                        Toast.makeText(context, "${item.exercise} is now ${formatWeight(item.suggestedKg ?: 0.0)} kg in $where", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            if (item.kind == AdviceKind.Skipped) "${item.exercise} is out of $where" else "${item.exercise} is now ${formatWeight(item.suggestedKg ?: 0.0)} kg in $where",
+                            Toast.LENGTH_SHORT,
+                        ).show()
                     }
                 },
                 onDismiss = onDismiss?.let { dismiss -> { dismiss(item) } },
@@ -153,7 +159,11 @@ internal fun AdviceRow(
                     ) {
                         Icon(Icons.Rounded.Check, contentDescription = null, tint = advice.kind.tint(), modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Accept · ${formatWeight(advice.suggestedKg ?: 0.0)} kg", style = AppType.BodyStrong, color = advice.kind.tint())
+                        Text(
+                            if (advice.kind == AdviceKind.Skipped) "Remove from plan" else "Accept · ${formatWeight(advice.suggestedKg ?: 0.0)} kg",
+                            style = AppType.BodyStrong,
+                            color = advice.kind.tint(),
+                        )
                     }
                     if (acceptedIn != null) {
                         Spacer(Modifier.width(10.dp))

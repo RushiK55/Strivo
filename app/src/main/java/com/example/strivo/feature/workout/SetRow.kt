@@ -197,7 +197,7 @@ internal fun SetRow(
 
 /** A tappable value in the set table. Sets still to do show a field; done sets show just the number. */
 @Composable
-private fun MetricField(value: String, filled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun MetricField(value: String, filled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .height(38.dp)

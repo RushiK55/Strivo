@@ -144,6 +144,13 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
   one if it is still true (`UserPrefs.snoozeToday`: keys kept with their date, so a new day starts with none).
 - **During a workout** every exercise has an (i) button, in the list and in the full-screen set view, that opens everything about it: the plan, its
   notes, how it is done, the tip, the muscles and a video (`ExerciseInfoSheet`; the words come from the exercise library, found by name).
+- **Skipped exercises.** A workout finished early remembers the exercises of the plan it left out (`workout_sessions.skipped`, a JSON list of names,
+  backed up with the workout so the dashboard lists them). The coach (`skipAdvice`, tested) says "You keep skipping X" when an exercise was left out
+  of at least 3 of a plan's last 4 workouts, the latest included, and offers "Remove from plan"; doing it once clears the advice. A workout that is
+  finished (all of it, or early) stays finished: it cannot be started again that day.
+- **Logging without the timer.** "Already did it? Log it" on an exercise in the workout (`LogExerciseSheet`, `WorkoutViewModel.logExercise`) fills in the
+  sets, reps, weight and (optional) time of each set afterwards; they are saved as done, the exercise is ticked off, and the logged times are added to the
+  workout total, since its clock never ran for them. It is not offered once the workout is finished.
 - **Plans on a day.** Putting a plan on a day (`StrivoRepository.copyPlanToDay`, `addLibraryPlanToDay`) makes a copy that stays linked to the user's
   plan (`plans.sourcePlanId`, `exercises.sourceId`; taking a library plan first makes the user's own plan, once). Everything a day plans (every
   set's weight and reps, the sets, name, notes, an exercise added or taken out) is written to the user's plan at once

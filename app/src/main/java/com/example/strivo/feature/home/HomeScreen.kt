@@ -320,7 +320,8 @@ fun HomeScreen(
                                 exercises = exerciseCount(plan),
                                 completed = completed,
                                 canStart = !completed && exerciseCount(plan) > 0,
-                                onClick = { onOpenPlan(plan) },
+                                // A plan that is done for the day (finished, or finished early) is only looked at: no starting it again.
+                                onClick = { if (completed) onViewPlan(plan) else onOpenPlan(plan) },
                                 onStart = { onStartWorkout(plan) },
                                 onDelete = { planToDelete = plan },
                             )

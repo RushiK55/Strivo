@@ -236,7 +236,7 @@ internal fun StrivoNavGraph(
                         navController.navigate(Routes.saveExercise(plan.planId, exercise.id))
                     },
                     onOpenExercise = { exercise ->
-                        exercise.id?.let { navController.navigate(Routes.exerciseDetails(plan.planId, it)) }
+                        exercise.id?.let { navController.navigate(Routes.exerciseDetails(plan.planId, it, viewOnly = entry.arguments?.getBoolean("viewOnly") == true)) }
                     },
                     onStartWorkout = { navController.navigate(Routes.workout(plan.planId)) },
                 )
@@ -270,6 +270,7 @@ internal fun StrivoNavGraph(
             arguments = listOf(
                 navArgument("planId") { type = NavType.LongType },
                 navArgument("exerciseId") { type = NavType.LongType },
+                navArgument("viewOnly") { type = NavType.BoolType; defaultValue = false },
             ),
         ) { entry ->
             val plan = planById(entry.arguments?.getLong("planId"))
@@ -280,6 +281,7 @@ internal fun StrivoNavGraph(
                     plan = plan,
                     onBack = { navController.popBackStack() },
                     onStartWorkout = { navController.navigate(Routes.workout(plan.planId)) },
+                    canStart = entry.arguments?.getBoolean("viewOnly") != true,
                 )
             } else {
                 BlankScreen()

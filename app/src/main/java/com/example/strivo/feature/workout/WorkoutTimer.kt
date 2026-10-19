@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Pause
@@ -61,6 +62,8 @@ internal fun WorkoutTimerHeader(
     doneExercises: Int,
     totalExercises: Int,
     modifier: Modifier = Modifier,
+    /** The workout is finished: the clock stops for good, and there is no Start or Resume. */
+    finished: Boolean = false,
 ) {
     val workoutTime by viewModel.workoutTime.collectAsStateWithLifecycle()
     val started = workoutTime != ZeroTime
@@ -75,6 +78,7 @@ internal fun WorkoutTimerHeader(
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val (dot, label) = when {
+                        finished -> AppColors.Accent to "Finished for today"
                         isRunning -> AppColors.Success to "In progress"
                         started || isPaused -> AppColors.Warning to "Paused"
                         else -> AppColors.TextTertiary to "Not started"
@@ -90,13 +94,13 @@ internal fun WorkoutTimerHeader(
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(AppColors.SurfaceHigh)
-                    .clickable(enabled = started, onClick = viewModel::resetWorkout),
+                    .clickable(enabled = started && !finished, onClick = viewModel::resetWorkout),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     Icons.Rounded.RestartAlt,
                     contentDescription = "Reset timer",
-                    tint = if (started) AppColors.TextPrimary else AppColors.TextTertiary,
+                    tint = if (started && !finished) AppColors.TextPrimary else AppColors.TextTertiary,
                     modifier = Modifier.size(22.dp),
                 )
             }
@@ -115,11 +119,16 @@ internal fun WorkoutTimerHeader(
                 modifier = Modifier
                     .height(44.dp)
                     .clip(RoundedCornerShape(22.dp))
-                    .background(buttonColor)
-                    .clickable(onClick = viewModel::startStopWorkout)
+                    .background(if (finished) AppColors.SurfaceHigh else buttonColor)
+                    .clickable(enabled = !finished, onClick = viewModel::startStopWorkout)
                     .padding(start = 14.dp, end = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (finished) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = AppColors.Accent, modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Done", color = AppColors.Accent, style = AppType.BodyStrong)
+                } else {
                 Icon(
                     imageVector = if (isRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                     contentDescription = null,
@@ -136,6 +145,7 @@ internal fun WorkoutTimerHeader(
                     color = Color.Black,
                     style = AppType.BodyStrong,
                 )
+                }
             }
         }
         Spacer(Modifier.height(14.dp))

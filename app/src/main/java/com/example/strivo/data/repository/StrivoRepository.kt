@@ -195,6 +195,24 @@ class StrivoRepository(
         }
     }
 
+    /**
+     * Takes the exercise called [exerciseName] out of every plan called [planName] (the weekday's plans and the user's own plan), the
+     * way the coach's "remove from plan" does. Returns how many were removed.
+     */
+    suspend fun removeExerciseFromPlansNamed(planName: String, exerciseName: String): Int = io {
+        val plans = db.readAllPlans().filter { it.planName == planName }.mapNotNull { it.planId }
+        val key = exerciseKey(exerciseName)
+        val targets = plans.flatMap { planId -> db.readExercisesByPlan(planId) }.filter { exerciseKey(it.name) == key }
+        targets.forEach { exercise ->
+            exercise.id?.let { id ->
+                db.deleteExercise(id)
+                removeFromUsersPlan(exercise)
+                record(exerciseRemoved(exercise, db.getPlan(exercise.planId), now()))
+            }
+        }
+        targets.size
+    }
+
     suspend fun moveExerciseToPlan(id: Long, targetPlanId: Long) = io {
         val exercise = db.getExercise(id)
         exercise?.let { removeFromUsersPlan(it) }
