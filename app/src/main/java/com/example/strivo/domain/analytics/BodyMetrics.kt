@@ -95,8 +95,11 @@ fun activityLevelFor(trainingDaysPerWeek: Double): ActivityLevel = when {
     else -> ActivityLevel(1.725, "Hard: 6-7 days a week")
 }
 
-/** Rough energy used by a strength workout: MET x body weight (kg) x hours. */
-fun estimateWorkoutCalories(seconds: Long, weightKg: Double): Double = STRENGTH_MET * weightKg * seconds / 3600.0
+/**
+ * Rough energy used by a strength workout above resting: (MET - 1) x body weight (kg) x hours. The 1 MET of resting is
+ * already in the day's base burn, so counting it again would overstate what the workout added.
+ */
+fun estimateWorkoutCalories(seconds: Long, weightKg: Double): Double = (STRENGTH_MET - 1.0) * weightKg * seconds / 3600.0
 
 /** The weight on [date]: the latest weigh-in on or before it, otherwise the earliest one. */
 fun weightAt(entries: List<WeightEntry>, date: LocalDate): Double? {

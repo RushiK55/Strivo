@@ -9,7 +9,7 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -69,7 +69,7 @@ private data class Tab(val route: String, val label: String, val icon: ImageVect
 
 private val Tabs = listOf(
     Tab(Routes.HOME, "Home", Icons.Rounded.Home),
-    Tab(Routes.FOOD, "Food", Icons.Rounded.Restaurant),
+    Tab(Routes.FOOD, "Calories", Icons.Rounded.LocalFireDepartment),
     Tab(Routes.ANALYTICS, "Analytics", Icons.Rounded.BarChart),
     Tab(Routes.HISTORY, "History", Icons.Rounded.History),
     Tab(Routes.PROFILE, "Profile", Icons.Rounded.Person),

@@ -297,6 +297,11 @@ class UserPrefs(context: Context, uid: String) {
         get() = prefs.getBoolean(KEY_ASKED_NOTIFICATIONS, false)
         set(value) { prefs.edit().putBoolean(KEY_ASKED_NOTIFICATIONS, value).apply() }
 
+    /** The goal picked on the Calories screen, as a CalorieGoal key; null until chosen. */
+    var calorieGoal: String?
+        get() = prefs.getString(KEY_CALORIE_GOAL, null)
+        set(value) { prefs.edit().putString(KEY_CALORIE_GOAL, value).apply() }
+
     /** Returns true (once per calendar day) when the daily reset should run. */
     fun consumeDailyReset(): Boolean {
         val today = todayIso()
@@ -315,6 +320,7 @@ class UserPrefs(context: Context, uid: String) {
         /** The SharedPreferences file for [uid]; also used to find the file when moving old data in. */
         fun fileNameFor(uid: String) = "strivo_user_${uid.filter { it.isLetterOrDigit() || it == '_' }}"
 
+        private const val KEY_CALORIE_GOAL = "calorie_goal"
         private const val KEY_GENDER = "user_gender"
         private const val KEY_AGE = "user_age"
         private const val KEY_HEIGHT = "user_height"

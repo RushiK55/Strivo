@@ -11,19 +11,24 @@ import com.example.strivo.domain.analytics.BodyProfile
 import com.example.strivo.domain.analytics.BodyReport
 import com.example.strivo.domain.analytics.ConsistencyReport
 import com.example.strivo.domain.analytics.ExerciseHistory
+import com.example.strivo.domain.analytics.EnergySummary
 import com.example.strivo.domain.analytics.ExpenditureStatus
 import com.example.strivo.domain.analytics.ExtraActivity
 import com.example.strivo.domain.analytics.FoodEntry
 import com.example.strivo.domain.analytics.NutritionReport
 import com.example.strivo.domain.analytics.RecordEvent
 import com.example.strivo.domain.analytics.WeightEntry
+import com.example.strivo.domain.analytics.averageActiveKcal
+import com.example.strivo.domain.analytics.baseBurnKcal
 import com.example.strivo.domain.analytics.buildBodyReport
+import com.example.strivo.domain.analytics.buildEnergyDay
 import com.example.strivo.domain.analytics.buildConsistency
 import com.example.strivo.domain.analytics.buildNutrition
 import com.example.strivo.domain.analytics.buildReport
 import com.example.strivo.domain.analytics.estimateExpenditure
 import com.example.strivo.domain.analytics.exerciseHistories
 import com.example.strivo.domain.analytics.recentRecords
+import com.example.strivo.domain.analytics.summarizeEnergy
 import com.example.strivo.domain.analytics.weightAt
 import com.example.strivo.domain.coach.Advice
 import com.example.strivo.domain.coach.AdviceKind
@@ -54,6 +59,8 @@ data class AnalyticsState(
     /** Records broken in the last 30 days, newest first. */
     val records: List<RecordEvent> = emptyList(),
     val expenditure: ExpenditureStatus? = null,
+    /** Calories eaten against calories burned over the range, day by day. */
+    val energy: EnergySummary? = null,
     /** What the coach suggests doing next, most important first. */
     val advice: List<Advice> = emptyList(),
     /** Each exercise in the user's own plans, by exerciseKey: advice about these can be accepted into the plan. */
@@ -173,16 +180,20 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             val weightOn = { date: LocalDate -> weightAt(weightLog, date) ?: profile.weightKg }
             val body = buildBodyReport(profile, weightLog, sessions, today)
             val exercises = exerciseHistories(sessions)
+            val expenditure = estimateExpenditure(food, weightLog, today)
+            val builtReport = buildReport(sessions, range, today, activities, restDays, weightOn)
+            val base = baseBurnKcal(body.bmrKcal, expenditure.estimate, averageActiveKcal(sessions, activities, weightOn, today))
             AnalyticsState(
                 isLoading = false,
                 range = range,
-                report = buildReport(sessions, range, today, activities, restDays, weightOn),
+                report = builtReport,
+                energy = summarizeEnergy(builtReport.days.map { buildEnergyDay(it.date, food, sessions, activities, weightOn, base) }, today),
                 body = body,
                 nutrition = buildNutrition(food, range, today, body.maintenanceKcal),
                 consistency = buildConsistency(sessions, scheduledPlans, range, today),
                 exercises = exercises,
                 records = recentRecords(exercises, today.minusDays(29)),
-                expenditure = estimateExpenditure(food, weightLog, today),
+                expenditure = expenditure,
                 // Advice the plans already follow has been accepted (or done by hand): nothing left to say.
                 advice = coachAdvice(exercises, body, weightLog, food, sessions, today)
                     .filterNot { advice -> advice.exercise?.let { advice.isInPlans(planned[exerciseKey(it)]?.map { p -> p.weightKg }) } ?: false }

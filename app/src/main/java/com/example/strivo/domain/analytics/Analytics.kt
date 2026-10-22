@@ -121,7 +121,7 @@ fun buildReport(
             extraKcal = (extraByDate[date].orEmpty()).sumOf { it.calories }.toDouble(),
             extras = extraByDate[date].orEmpty(),
             kcal = daySessions.sumOf { session ->
-                weightKgOn(date)?.let { estimateWorkoutCalories(parseDurationSeconds(session.totalTime), it) } ?: 0.0
+                weightKgOn(date)?.let { estimateWorkoutCalories(workoutSecondsForCalories(session), it) } ?: 0.0
             },
             planNames = daySessions.map { it.planName }.distinct(),
             sessions = daySessions,

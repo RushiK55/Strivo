@@ -157,7 +157,7 @@ fun AnalyticsScreen(
                 AnalyticsTab.Body -> bodyTab(body) { editingBody = it }
                 AnalyticsTab.Nutrition -> {
                     item { RangeSelector(state.range, viewModel::setRange) }
-                    nutritionTab(report, body, nutrition, state.expenditure, onOpenFood, viewModel::addActivity, viewModel::deleteActivity)
+                    nutritionTab(report, body, nutrition, state.expenditure, state.energy, onOpenFood, viewModel::addActivity, viewModel::deleteActivity)
                 }
             }
         }

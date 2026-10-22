@@ -17,7 +17,7 @@ class ExtraActivityTest {
     private fun activity(daysAgo: Int, name: String, kcal: Int, minutes: Int? = null) =
         ExtraActivity(date = today.minusDays(daysAgo.toLong()), name = name, calories = kcal, minutes = minutes)
 
-    // A 45-minute workout; at 80 kg that is 5 x 80 x 0.75 = 300 kcal.
+    // A 45-minute workout; at 80 kg that is (5 - 1) x 80 x 0.75 = 240 kcal.
     private val workout = WorkoutSession(
         planName = "Push",
         date = today.minusDays(1).atTime(LocalTime.NOON),
@@ -31,11 +31,11 @@ class ExtraActivityTest {
         val report = buildReport(listOf(workout), AnalyticsRange.Week, today, extras) { 80.0 }
 
         assertEquals(750.0, report.extraCalories, 0.001)
-        assertEquals(300.0, report.workoutCalories!!, 0.001)
-        assertEquals(1050.0, report.caloriesBurned!!, 0.001)
+        assertEquals(240.0, report.workoutCalories!!, 0.001)
+        assertEquals(990.0, report.caloriesBurned!!, 0.001)
         val yesterday = report.days[5]
         assertEquals(500.0, yesterday.extraKcal, 0.001)
-        assertEquals(800.0, yesterday.burnedKcal, 0.001) // workout 300 + extras 500
+        assertEquals(740.0, yesterday.burnedKcal, 0.001) // workout 240 + extras 500
         assertEquals(2, yesterday.extras.size)
         assertEquals(250.0, report.days[3].burnedKcal, 0.001) // a day with only an extra
     }

@@ -151,6 +151,14 @@ Composable screen ──▶ ViewModel ──▶ StrivoRepository ──▶ Striv
 - **Logging without the timer.** "Already did it? Log it" on an exercise in the workout (`LogExerciseSheet`, `WorkoutViewModel.logExercise`) fills in the
   sets, reps, weight and (optional) time of each set afterwards; they are saved as done, the exercise is ticked off, and the logged times are added to the
   workout total, since its clock never ran for them. It is not offered once the workout is finished.
+- **Calories** (the Calories tab, `feature/food`; `domain/analytics/EnergyBalance.kt`). A day is calories in against calories out: burned = base +
+  active. Base is the formula's resting rate x 1.2 until Strivo has learned what the user really burns (`estimateExpenditure`), then that figure minus the
+  exercise already in it (`baseBurnKcal`), so a workout is never counted twice. Active is workouts plus the activity the user added, both counted above
+  resting, (MET - 1) x kg x hours. A workout whose clock is far too short for its sets (logged afterwards) is costed from its sets
+  (`workoutSecondsForCalories`). The goal (lose / maintain / gain, kept per account in `UserPrefs.calorieGoal`) moves the day's target by -550 / 0 / +275 kcal.
+  Activity can be added from the Calories tab and from Analytics through the shared `ActivitySheet` (core), which estimates calories from minutes.
+  The food sheet suggests the user's own foods and `CommonFoods` (typical servings) and scales them by servings. Today is left out of a week's average
+  while it is still being eaten. All of it is worded as an estimate.
 - **Plans on a day.** Putting a plan on a day (`StrivoRepository.copyPlanToDay`, `addLibraryPlanToDay`) makes a copy that stays linked to the user's
   plan (`plans.sourcePlanId`, `exercises.sourceId`; taking a library plan first makes the user's own plan, once). Everything a day plans (every
   set's weight and reps, the sets, name, notes, an exercise added or taken out) is written to the user's plan at once

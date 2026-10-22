@@ -84,16 +84,16 @@ class BodyMetricsTest {
     }
 
     @Test
-    fun workoutCaloriesAreMetTimesWeightTimesHours() {
-        assertEquals(350.0, estimateWorkoutCalories(3600, 70.0), 0.001) // 5 x 70 x 1h
-        assertEquals(175.0, estimateWorkoutCalories(1800, 70.0), 0.001)
+    fun workoutCaloriesAreMetAboveRestingTimesWeightTimesHours() {
+        assertEquals(280.0, estimateWorkoutCalories(3600, 70.0), 0.001) // (5 - 1) x 70 x 1h
+        assertEquals(140.0, estimateWorkoutCalories(1800, 70.0), 0.001)
     }
 
     @Test
     fun reportCostsWorkoutsWithTheWeightOfThatDay() {
         val sessions = listOf(session(1, "Bench Press", 60.0 to 8)) // 45 min
         val withWeight = buildReport(sessions, AnalyticsRange.Week, today) { 80.0 }
-        assertEquals(5.0 * 80.0 * 0.75, withWeight.caloriesBurned!!, 0.001)
+        assertEquals(4.0 * 80.0 * 0.75, withWeight.caloriesBurned!!, 0.001)
 
         // Without any known weight nothing is made up.
         assertNull(buildReport(sessions, AnalyticsRange.Week, today).caloriesBurned)
