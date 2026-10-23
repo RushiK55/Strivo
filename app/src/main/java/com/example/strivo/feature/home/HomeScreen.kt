@@ -95,6 +95,7 @@ fun HomeScreen(
     onOpenCoach: () -> Unit = {},
     acceptLabel: (Advice) -> String? = { null },
     onAcceptAdvice: (Advice) -> Unit = {},
+    onDeclineAdvice: (Advice) -> Unit = {},
 ) {
     val today = remember { LocalDate.now() }
     val currentWeek = remember { weekOf(today) }
@@ -107,7 +108,6 @@ fun HomeScreen(
     val snoozed by planViewModel.snoozed.collectAsStateWithLifecycle()
     // What the user closed today stays hidden until tomorrow, when it comes back if it is still true.
     val shownOffers = offers.filter { "offer:" + it.ids.joinToString(",") !in snoozed }
-    val shownAdvice = advice.filter { "advice:${it.kind}:${it.exercise.orEmpty()}" !in snoozed }
     val context = LocalContext.current
     AskToAllowNotifications()
     // What accepting did ("Added 7 plans to your week"), said once.
@@ -359,18 +359,18 @@ fun HomeScreen(
             }
 
             // The coach: the few things most worth doing next, from the user's own logs.
-            if (shownAdvice.isNotEmpty()) {
+            if (advice.isNotEmpty()) {
                 item {
                     Spacer(Modifier.height(28.dp))
                     AccentTitle("For you", modifier = Modifier.padding(start = 4.dp), fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
                     AdviceCard(
-                        shownAdvice,
+                        advice,
                         limit = 3,
                         onSeeAll = onOpenCoach,
                         acceptLabel = acceptLabel,
                         onAccept = onAcceptAdvice,
-                        onDismiss = { planViewModel.snooze("advice:${it.kind}:${it.exercise.orEmpty()}") },
+                        onDecline = onDeclineAdvice,
                     )
                 }
             }

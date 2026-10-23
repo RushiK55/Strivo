@@ -111,6 +111,7 @@ internal fun StrivoNavGraph(
                 onOpenCoach = { navController.openTab(Routes.ANALYTICS) },
                 acceptLabel = coach::acceptLabel,
                 onAcceptAdvice = coachViewModel::acceptAdvice,
+                onDeclineAdvice = coachViewModel::declineAdvice,
             )
         }
 

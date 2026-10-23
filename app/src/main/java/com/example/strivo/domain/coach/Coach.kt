@@ -56,12 +56,11 @@ const val InactiveDays = 5
 /** Advice is only given for lifts done in this many days, so it is never about something long dropped. */
 private const val RecentLiftDays = 28L
 
-/** How much to add next time: 2.5 kg on heavier lifts, smaller steps on light ones. */
-fun progressionStepKg(kg: Double): Double = when {
-    kg >= 20 -> 2.5
-    kg >= 5 -> 1.0
-    else -> 0.5
-}
+/** Weight from which the coach adds 5 kg at a time; below it, 2.5 kg. It never suggests a 1 kg jump: plates and dumbbells do not come that small. */
+const val BigStepFromKg = 80.0
+
+/** How much to add next time: 2.5 kg, or 5 kg on the heaviest lifts. */
+fun progressionStepKg(kg: Double): Double = if (kg >= BigStepFromKg) 5.0 else 2.5
 
 /** About 10% lighter, rounded to the same steps, for a lighter week. Always below [kg]. */
 fun deloadKg(kg: Double): Double {
@@ -296,6 +295,20 @@ fun Advice.isInPlans(plannedKg: List<Double>?): Boolean {
         AdviceKind.Deload -> plannedKg.all { it <= kg + 0.01 }
         else -> false
     }
+}
+
+/** What a declined tip is remembered by: what it says and about what, so a different suggestion is a new tip. */
+val Advice.declineKey: String
+    get() = listOf(kind.name, exercise.orEmpty(), planName.orEmpty(), suggestedKg?.toString().orEmpty()).joinToString(":")
+
+/**
+ * The data this tip is worked out from. A declined tip stays closed while this is unchanged; once it changes (a new workout, a new
+ * weigh-in, food logged on a new day) the coach works it out again, and if it is still true the tip comes back.
+ */
+fun Advice.dataStamp(sessions: List<WorkoutSession>, weightLog: List<WeightEntry>, food: List<FoodEntry>): String = when (kind) {
+    AdviceKind.WeighIn, AdviceKind.FastLoss, AdviceKind.FastGain -> "weigh:${weightLog.size}:${weightLog.maxOfOrNull { it.date }}"
+    AdviceKind.Protein -> "food:${food.maxOfOrNull { it.date }}"
+    else -> "workouts:${sessions.size}:${sessions.maxOfOrNull { it.date }}"
 }
 
 /** Advice is matched to exercises by name, the way analytics groups them. */

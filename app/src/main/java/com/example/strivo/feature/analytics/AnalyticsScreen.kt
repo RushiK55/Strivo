@@ -94,6 +94,7 @@ fun AnalyticsScreen(
             advice = state.advice.firstOrNull { it.exercise.equals(opened.name, ignoreCase = true) },
             acceptLabel = state::acceptLabel,
             onAccept = viewModel::acceptAdvice,
+            onDecline = viewModel::declineAdvice,
             onBack = { openExercise = null },
         )
         return
@@ -133,7 +134,7 @@ fun AnalyticsScreen(
                             Column {
                                 AccentTitle("Coach")
                                 Spacer(Modifier.height(12.dp))
-                                AdviceCard(state.advice, acceptLabel = state::acceptLabel, onAccept = viewModel::acceptAdvice)
+                                AdviceCard(state.advice, limit = 4, acceptLabel = state::acceptLabel, onAccept = viewModel::acceptAdvice, onDecline = viewModel::declineAdvice)
                             }
                         }
                     }

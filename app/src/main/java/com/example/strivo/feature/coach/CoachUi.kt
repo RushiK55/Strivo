@@ -1,6 +1,7 @@
 package com.example.strivo.feature.coach
 
 import android.widget.Toast
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.MonitorWeight
 import androidx.compose.material.icons.rounded.Restaurant
@@ -29,6 +32,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,7 +72,8 @@ private fun AdviceKind.tint(): Color = when (this) {
 }
 
 /**
- * The coach's suggestions in one card. Only the first [limit] are shown; with [onSeeAll], a last row leads to the rest.
+ * The coach's suggestions in one card. Only the first [limit] are shown; with [onSeeAll], a last row leads to the rest, and
+ * without it a last row opens and closes the rest in place.
  * Advice with an [acceptLabel] (the plan it would change) gets an Accept button, which hands it to [onAccept] to put its
  * weight into the plans.
  */
@@ -77,12 +85,13 @@ internal fun AdviceCard(
     onSeeAll: (() -> Unit)? = null,
     acceptLabel: (Advice) -> String? = { null },
     onAccept: (Advice) -> Unit = {},
-    /** Closes a tip for today: it is hidden until tomorrow, and is back then if it is still true. */
-    onDismiss: ((Advice) -> Unit)? = null,
+    /** Declines a tip: it stays closed until the coach has new data (a workout, a weigh-in) and works it out again; it is back then if it is still true. */
+    onDecline: ((Advice) -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    val shown = advice.take(limit)
-    AppCard(modifier = modifier, padding = PaddingValues(vertical = 4.dp)) {
+    var expanded by remember { mutableStateOf(false) }
+    val shown = if (expanded && onSeeAll == null) advice else advice.take(limit)
+    AppCard(modifier = modifier.animateContentSize(), padding = PaddingValues(vertical = 4.dp)) {
         shown.forEachIndexed { index, item ->
             if (index > 0) HorizontalDivider(Modifier.padding(start = 66.dp), thickness = 1.dp, color = AppColors.Divider)
             val where = acceptLabel(item)
@@ -99,8 +108,31 @@ internal fun AdviceCard(
                         ).show()
                     }
                 },
-                onDismiss = onDismiss?.let { dismiss -> { dismiss(item) } },
+                onDecline = onDecline?.let { decline ->
+                    {
+                        decline(item)
+                        Toast.makeText(context, "Declined. The coach checks again when you log something new.", Toast.LENGTH_SHORT).show()
+                    }
+                },
             )
+        }
+        if (onSeeAll == null && advice.size > limit) {
+            HorizontalDivider(Modifier.padding(start = 66.dp), thickness = 1.dp, color = AppColors.Divider)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(start = 66.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (expanded) "Show less" else "Show ${advice.size - limit} more",
+                    style = AppType.BodyStrong,
+                    color = AppColors.Accent,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown, contentDescription = null, tint = AppColors.Accent)
+            }
         }
         if (onSeeAll != null) {
             HorizontalDivider(Modifier.padding(start = 66.dp), thickness = 1.dp, color = AppColors.Divider)
@@ -130,9 +162,9 @@ internal fun AdviceRow(
     modifier: Modifier = Modifier,
     acceptedIn: String? = null,
     onAccept: (() -> Unit)? = null,
-    onDismiss: (() -> Unit)? = null,
+    onDecline: (() -> Unit)? = null,
 ) {
-    Row(modifier.padding(start = 14.dp, end = if (onDismiss != null) 6.dp else 14.dp, top = 12.dp, bottom = 12.dp)) {
+    Row(modifier.padding(start = 14.dp, end = if (onDecline != null) 6.dp else 14.dp, top = 12.dp, bottom = 12.dp)) {
         Box(
             Modifier
                 .size(38.dp)
@@ -172,12 +204,12 @@ internal fun AdviceRow(
                 }
             }
         }
-        if (onDismiss != null) {
+        if (onDecline != null) {
             Box(
-                Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onDismiss),
+                Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onDecline),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.Close, contentDescription = "Close for today, it comes back tomorrow", tint = AppColors.TextTertiary, modifier = Modifier.size(18.dp))
+                Icon(Icons.Rounded.Close, contentDescription = "Decline this tip", tint = AppColors.TextTertiary, modifier = Modifier.size(18.dp))
             }
         }
     }

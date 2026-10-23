@@ -35,6 +35,8 @@ import com.example.strivo.domain.coach.AdviceKind
 import com.example.strivo.domain.coach.PlannedExercise
 import com.example.strivo.domain.coach.acceptedIn
 import com.example.strivo.domain.coach.coachAdvice
+import com.example.strivo.domain.coach.dataStamp
+import com.example.strivo.domain.coach.declineKey
 import com.example.strivo.domain.coach.exerciseKey
 import com.example.strivo.domain.coach.isInPlans
 import com.example.strivo.domain.model.EXTRA_PLAN_NAME
@@ -85,6 +87,8 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
     private var scheduledPlans: Map<DayOfWeek, Int> = emptyMap()
     /** Planned weight of each copy of each exercise in the user's plans, by exerciseKey. */
     private var planned: Map<String, List<PlannedExercise>> = emptyMap()
+    /** Tips the user declined, with the data each was worked out from: closed until that data changes. */
+    private var declined: Map<String, String> = emptyMap()
 
     private val _state = MutableStateFlow(AnalyticsState())
     val state: StateFlow<AnalyticsState> = _state
@@ -96,6 +100,7 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
             weightLog = repository.readWeightLog()
             food = repository.readFood()
             planned = repository.plannedExercises()
+            declined = repository.declinedAdvice()
             activities = repository.readActivities()
             scheduledPlans = repository.readAllPlans()
                 .filter { !it.isPrebuilt && it.planName != EXTRA_PLAN_NAME && !it.isOneOff }
@@ -107,6 +112,16 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
                 restDays = saved.restDays
                 BodyProfile(saved.gender, saved.age, saved.height, saved.weight)
             }
+            recompute(_state.value.range)
+        }
+    }
+
+    /** Declines a tip: it stays closed until the coach has new data to work it out from, and comes back then if it is still true. */
+    fun declineAdvice(advice: Advice) {
+        viewModelScope.launch {
+            val stamp = advice.dataStamp(sessions, weightLog, food)
+            repository.declineAdvice(advice.declineKey, stamp)
+            declined = declined + (advice.declineKey to stamp)
             recompute(_state.value.range)
         }
     }
@@ -198,7 +213,9 @@ class AnalyticsViewModel(application: Application) : AndroidViewModel(applicatio
                 advice = coachAdvice(exercises, body, weightLog, food, sessions, today)
                     .filterNot { advice -> advice.exercise?.let { advice.isInPlans(planned[exerciseKey(it)]?.map { p -> p.weightKg }) } ?: false }
                     // A skipped exercise already taken out of its plan has nothing left to say.
-                    .filterNot { advice -> advice.kind == AdviceKind.Skipped && planned[exerciseKey(advice.exercise.orEmpty())]?.any { it.planName == advice.planName } != true },
+                    .filterNot { advice -> advice.kind == AdviceKind.Skipped && planned[exerciseKey(advice.exercise.orEmpty())]?.any { it.planName == advice.planName } != true }
+                    // Declined, and nothing new to go on since.
+                    .filterNot { advice -> declined[advice.declineKey] == advice.dataStamp(sessions, weightLog, food) },
                 plannedExercises = planned,
             )
         }

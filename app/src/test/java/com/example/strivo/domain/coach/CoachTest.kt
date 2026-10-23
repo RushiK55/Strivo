@@ -99,11 +99,32 @@ class CoachTest {
 
     @Test
     fun stepsSuitTheWeight() {
-        assertEquals(2.5, progressionStepKg(60.0), 0.0)
-        assertEquals(1.0, progressionStepKg(12.0), 0.0)
-        assertEquals(0.5, progressionStepKg(4.0), 0.0)
+        // Never a 1 kg jump: 2.5 kg, or 5 kg on the heaviest lifts.
+        assertEquals(5.0, progressionStepKg(80.0), 0.0)
+        assertEquals(5.0, progressionStepKg(100.0), 0.0)
+        assertEquals(2.5, progressionStepKg(79.0), 0.0)
+        assertEquals(2.5, progressionStepKg(12.0), 0.0)
+        assertEquals(2.5, progressionStepKg(4.0), 0.0)
         assertEquals(90.0, deloadKg(100.0), 0.0)
         assertTrue(deloadKg(2.5) < 2.5)
+        assertEquals(7.5, deloadKg(10.0), 0.0)
+    }
+
+    @Test
+    fun aDeclinedTipIsRememberedByWhatItSaysAndComesBackWhenTheDataChanges() {
+        val tip = Advice(AdviceKind.IncreaseWeight, "Go heavier on Bench", "x", "Bench", 62.5)
+        val other = tip.copy(suggestedKg = 65.0)
+        assertTrue(tip.declineKey != other.declineKey)
+        val workout = { day: Long -> bench(day, 60.0, 8) }
+        val before = tip.dataStamp(listOf(workout(3), workout(2)), emptyList(), emptyList())
+        // The same workouts: still declined. A new workout: the coach works it out again.
+        assertEquals(before, tip.dataStamp(listOf(workout(3), workout(2)), emptyList(), emptyList()))
+        assertTrue(before != tip.dataStamp(listOf(workout(3), workout(2), workout(1)), emptyList(), emptyList()))
+        // A weigh-in tip waits for a weigh-in, not for a workout.
+        val weigh = Advice(AdviceKind.WeighIn, "Time to weigh in", "x")
+        val log = listOf(WeightEntry(today.minusDays(9), 80.0))
+        assertEquals(weigh.dataStamp(listOf(workout(1)), log, emptyList()), weigh.dataStamp(emptyList(), log, emptyList()))
+        assertTrue(weigh.dataStamp(emptyList(), log, emptyList()) != weigh.dataStamp(emptyList(), log + WeightEntry(today, 79.5), emptyList()))
     }
 
     // --- Body and food ---

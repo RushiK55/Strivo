@@ -470,6 +470,12 @@ class StrivoRepository(
 
     suspend fun snoozeToday(key: String) = io { prefs.snoozeToday(key) }
 
+    // --- Declined coach tips ---
+
+    suspend fun declinedAdvice(): Map<String, String> = io { prefs.declinedAdvice() }
+
+    suspend fun declineAdvice(key: String, stamp: String) = io { prefs.declineAdvice(key, stamp) }
+
     // --- Plan library ---
 
     /** The plans users can browse: the ones an admin has not hidden. */

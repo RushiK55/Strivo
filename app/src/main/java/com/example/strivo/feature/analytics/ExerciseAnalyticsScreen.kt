@@ -90,6 +90,7 @@ internal fun ExerciseAnalyticsScreen(
     advice: Advice?,
     acceptLabel: (Advice) -> String?,
     onAccept: (Advice) -> Unit,
+    onDecline: (Advice) -> Unit,
     onBack: () -> Unit,
 ) {
     val metrics = if (history.isWeighted) {
@@ -107,7 +108,7 @@ internal fun ExerciseAnalyticsScreen(
         ) {
             item { ProgressSummary(history) }
             // What to do next time, right under where it stands now.
-            if (advice != null) item { AdviceCard(listOf(advice), acceptLabel = acceptLabel, onAccept = onAccept) }
+            if (advice != null) item { AdviceCard(listOf(advice), acceptLabel = acceptLabel, onAccept = onAccept, onDecline = onDecline) }
             if (history.sessions.size >= 2) {
                 item {
                     Column {

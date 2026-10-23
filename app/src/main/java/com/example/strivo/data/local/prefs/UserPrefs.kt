@@ -267,6 +267,19 @@ class UserPrefs(context: Context, uid: String) {
         prefs.edit().putString(KEY_SNOOZE_DATE, todayIso()).putStringSet(KEY_SNOOZED, snoozedToday() + key).apply()
     }
 
+    // --- Declined coach tips ---
+    // A tip the user declines is remembered with the data it was worked out from (see Advice.dataStamp): it stays closed until that data
+    // changes, and then the coach works it out again and it is back if it is still true.
+
+    fun declinedAdvice(): Map<String, String> =
+        prefs.getStringSet(KEY_DECLINED_ADVICE, emptySet()).orEmpty()
+            .mapNotNull { entry -> entry.split('	', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }
+            .toMap()
+
+    fun declineAdvice(key: String, stamp: String) {
+        prefs.edit().putStringSet(KEY_DECLINED_ADVICE, (declinedAdvice() + (key to stamp)).map { (k, s) -> "$k	$s" }.toSet()).apply()
+    }
+
     // --- Notifications ---
 
     fun getNotifySettings() = NotifySettings(
@@ -344,6 +357,7 @@ class UserPrefs(context: Context, uid: String) {
         private const val KEY_DECLINED_PLANS = "declined_plans"
         private const val KEY_PENDING_ANSWERS = "plan_answers"
         private const val KEY_SNOOZE_DATE = "snooze_date"
+        private const val KEY_DECLINED_ADVICE = "declined_advice"
         private const val KEY_SNOOZED = "snoozed"
         private const val KEY_NOTIFY_REMINDERS = "notify_reminders"
         private const val KEY_NOTIFY_HOUR = "notify_hour"
